@@ -10,11 +10,6 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(lubridate)
-
-Sys.setenv("NEONSTORE_HOME" = "neon_store/")
-if(!dir.exists("neon_store/")){
-  dir.create("neon_store/")
-}
 ```
 
 This should work now!
@@ -22,25 +17,25 @@ This should work now!
 focal_sites <- c("BARC", "POSE")
 # Will download everything the first time, and then only download updated files:
 #Water quality
-neonstore::neon_download("DP1.20288.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20288.001", site =  focal_sites, type = "basic")
 #Precipiation: NOT WORKING!
-#neonstore::neon_download("DP1.00006.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+#neonstore::neon_download("DP1.00006.001", site =  focal_sites, type = "basic")
 # Wind Speed
-neonstore::neon_download("DP1.20059.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20059.001", site =  focal_sites, type = "basic")
 # Barometric Pressure
-neonstore::neon_download("DP1.20004.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20004.001", site =  focal_sites, type = "basic")
 # Air Temperature
-neonstore::neon_download("DP1.20046.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20046.001", site =  focal_sites, type = "basic")
 # PAR at water surface
-neonstore::neon_download("DP1.20042.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20042.001", site =  focal_sites, type = "basic")
 # PAR below water surface
-neonstore::neon_download("DP1.20261.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20261.001", site =  focal_sites, type = "basic")
 # Elevation of surface water
-neonstore::neon_download("DP1.20016.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20016.001", site =  focal_sites, type = "basic")
 # Groundwater temperature
-neonstore::neon_download("DP1.20217.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20217.001", site =  focal_sites, type = "basic")
 # Nitrate in surface water
-neonstore::neon_download("DP1.20033.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+neonstore::neon_download("DP1.20033.001", site =  focal_sites, type = "basic")
 
 
 
@@ -262,12 +257,10 @@ Loading `cleanedData` csv
 
 Plotting variables against DO
 ```{r}
-x_names <- colnames(cleanedData)[5:ncol(cleanedData)] 
-for (i in x_names){
-  plt <- cleanedData %>%
-    collect %>% 
-    ggplot(aes_string(x = i, y = "dissolvedOxygen")) +
-    geom_point()
-  print(plt)
-}
+plot <- cleanedData %>%
+  pivot_longer(colnames(cleanedData)[5:ncol(cleanedData)], names_to = "Driver", values_to = "Obs") %>% 
+  ggplot() +
+  geom_point(mapping = aes(x = Obs, y = dissolvedOxygen)) +
+  facet_wrap(~ Driver, nrow = 3, scales = "free")
+plot
 ```
