@@ -7,30 +7,81 @@ output: html_document
 ```{r}
 library(neonstore)
 library(dplyr)
+library(ggplot2)
 library(tidyverse)
 library(lubridate)
-library(neonUtilities)
 
 Sys.setenv("NEONSTORE_HOME" = "neon_store/")
-if(dir.exists("neon_store/")){
+if(!dir.exists("neon_store/")){
   dir.create("neon_store/")
 }
 ```
 
-Pulling all the data that I think will be relevant from NEON
+This should work now!
 ```{r}
 focal_sites <- c("BARC", "POSE")
-oxy <- neonUtilities::loadByProduct("DP1.20288.001", site = focal_sites) # Water quality (includes DO)
-precipitation <- neonUtilities::loadByProduct("DP1.00006.001", site =  focal_sites) # precipitation
-wind <- neonUtilities::loadByProduct("DP1.20059.001", site =  focal_sites) # wind speed
-pressure <- neonUtilities::loadByProduct("DP1.20004.001", site =  focal_sites) # baromeVtric pressure
-temperature <- neonUtilities::loadByProduct("DP1.20046.001", site =  focal_sites) # temperature
-par_surface <- neonUtilities::loadByProduct("DP1.20042.001", site =  focal_sites) # PAR at surface
-par_below <- neonUtilities::loadByProduct("DP1.20261.001", site =  focal_sites) # PAR below surface
-elevation_surface <- neonUtilities::loadByProduct("DP1.20016.001", site =  focal_sites) # Elevation of surf.
-groundwater_temp <- neonUtilities::loadByProduct("DP1.20217.001", site =  focal_sites) # Groundwater Temp
-nitrate_surface <- neonUtilities::loadByProduct("DP1.20033.001", site =  focal_sites) # Nitrate at surf.
+# Will download everything the first time, and then only download updated files:
+#Water quality
+neonstore::neon_download("DP1.20288.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+#Precipiation: NOT WORKING!
+#neonstore::neon_download("DP1.00006.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Wind Speed
+neonstore::neon_download("DP1.20059.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Barometric Pressure
+neonstore::neon_download("DP1.20004.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Air Temperature
+neonstore::neon_download("DP1.20046.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# PAR at water surface
+neonstore::neon_download("DP1.20042.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# PAR below water surface
+neonstore::neon_download("DP1.20261.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Elevation of surface water
+neonstore::neon_download("DP1.20016.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Groundwater temperature
+neonstore::neon_download("DP1.20217.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+# Nitrate in surface water
+neonstore::neon_download("DP1.20033.001", site =  focal_sites, type = "basic", .token = Sys.getenv("NEON_TOKEN"))
+
+
+
+# will import downloaded files into local SQL DB:
+neonstore::neon_store(product = "DP1.20288.001", type = "basic") #Water Quality
+#neonstore::neon_store(product = "DP1.00006.001", type = "basic") # Precip
+neonstore::neon_store(product = "DP1.20059.001", type = "basic") # Wind Speed
+neonstore::neon_store(product = "DP1.20004.001", type = "basic") # pressure
+neonstore::neon_store(product = "DP1.20046.001", type = "basic") # temperature
+neonstore::neon_store(product = "DP1.20042.001", type = "basic") # PAR surface
+neonstore::neon_store(product = "DP1.20261.001", type = "basic") # PAR below
+neonstore::neon_store(product = "DP1.20016.001", type = "basic") # Elevation of surface water
+neonstore::neon_store(product = "DP1.20217.001", type = "basic") # Groundwater temperature
+neonstore::neon_store(product = "DP1.20033.001", type = "basic") # Nitrate
+
+
+# Use a remote connection, so `dplyr` operations can be run by SQL:
+waq_con <- neon_db()
+waq <- tbl(waq_con, "waq_instantaneous-basic")
+#precip_con <- neon_db()
+# precip <- 
+wind_con <- neon_db()
+wind <- tbl(wind_con, "WSDBuoy_30min-basic")
+pressure_con <- neon_db()
+pressure <- tbl(pressure_con, "BP_30min-basic")
+airT_con <- neon_db()
+airT <- tbl(airT_con, "RHbuoy_30min-basic")
+PARsurf_con <- neon_db()
+PARsurf <- tbl(PARsurf_con, "PARWS_30min-basic")
+PARbelow_con <- neon_db() 
+PARbelow <- tbl(PARbelow_con, "uPAR_30min-basic")
+elevSurf_con <- neon_db()
+elevSurf <- tbl(elevSurf_con, "EOS_30_min-basic")
+waterT_con <- neon_db()
+waterT <- tbl(waterT_con, "TGW_30_minute-basic")
+nitrate_con <- neon_db()
+nitrate <- tbl(nitrate_con, "NSW_15_minute-basic")
 ```
+
+The rest is not going to work now! TO BE UPDATED! 
+
 Tidying up DO data, for exploration purposes I'm only going to look at the means here on but for forecasting, dealing with uncertainty will probably be the way to go.
 ```{r}
 oxy <- oxy$waq_instantaneous %>%
