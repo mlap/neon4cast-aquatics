@@ -82,55 +82,45 @@ nitrate <- tbl(nitrate_con, "NSW_15_minute-basic")
 
 The rest is not going to work now! TO BE UPDATED! 
 
-Tidying up DO data, for exploration purposes I'm only going to look at the means here on but for forecasting, dealing with uncertainty will probably be the way to go.
+Tidying up DO data, for exploration purposes I'm only going to look at the means here on but for forecasting, dealing with uncertainty will probably be the way to go. Note that the water quality data has potentially more important drivers like chlorophyll, turbidity and pH.
 ```{r}
-oxy <- oxy$waq_instantaneous %>%
-  filter(is.na(dissolvedOxygen) != TRUE)
-
-oxy_cleaned <- oxy %>%
-  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
-                dissolvedOxygenExpUncert,dissolvedOxygenFinalQF) %>%
-  dplyr::filter(dissolvedOxygenFinalQF == 0,
-                sensorDepth > 0) %>%
-  dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-  dplyr::mutate(date = as_date(startDateTime),
+oxy_cleaned <- waq %>%
+  select(siteID, startDateTime, dissolvedOxygen) %>%
+  filter(!(is.na(dissolvedOxygen))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
                 hour = hour(startDateTime)) %>%
-  dplyr::group_by(siteID, date, hour) %>%
-  dplyr::summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                   dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE),
-                   dissolvedOxygenExpUncert = mean(dissolvedOxygenExpUncert, na.rm = TRUE),
-                   sensorDepth = mean(sensorDepth, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
+  group_by(siteID, date, hour) %>%
+  summarise(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE)) %>%
+  select(siteID, date, hour, dissolvedOxygen)
 ```
 
-Cleaning up precipitation data and merging with DO table.
+Cleaning up precipitation data and merging with DO table. There is no precipitation data for the 2 sites -- NEONUtilities grabbed from proximal sites.
 ```{r}
-site_change <- function(x) {
-  if (x == "OSBS"){return("BARC")}
-  else{return("POSE")}
-}
-
-precipitation_cleaned <- precipitation$THRPRE_30min %>%
-  dplyr::select(siteID, startDateTime, TFPrecipBulk) %>%
-  dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-  dplyr::mutate(date = as_date(startDateTime),
-                hour = hour(startDateTime)) %>%
-  dplyr::group_by(siteID, date, hour) %>%
-  dplyr::summarize(TFPrecipBulk = mean(TFPrecipBulk, na.rm = TRUE)) %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  dplyr::select(siteID, startDateTime, TFPrecipBulk) %>%
-  dplyr::mutate(siteID = site_change(siteID))
-
-sensorData <- merge(oxy_cleaned, precipitation_cleaned, by=c("startDateTime", "siteID"))
+# site_change <- function(x) {
+#   if (x == "OSBS"){return("BARC")}
+#   else{return("POSE")}
+# }
+# 
+# precipitation_cleaned <- precipitation$THRPRE_30min %>%
+#   dplyr::select(siteID, startDateTime, TFPrecipBulk) %>%
+#   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
+#   dplyr::mutate(date = as_date(startDateTime),
+#                 hour = hour(startDateTime)) %>%
+#   dplyr::group_by(siteID, date, hour) %>%
+#   dplyr::summarize(TFPrecipBulk = mean(TFPrecipBulk, na.rm = TRUE)) %>%
+#   dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
+#                                               day = day(date), hour = hour,
+#                                               min = 0, tz ="UTC")) %>%
+#   dplyr::select(siteID, startDateTime, TFPrecipBulk) %>%
+#   dplyr::mutate(siteID = site_change(siteID))
+# 
+# sensorData <- merge(oxy_cleaned, precipitation_cleaned, by=c("startDateTime", "siteID"))
 ```
+
 Cleaning up and merging wind data
 ```{r}
-wind_cleaned <- wind$WSDBuoy_30min %>%
+wind_cleaned <- wind %>% 
   select(siteID, startDateTime, buoyWindSpeedMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -138,18 +128,14 @@ wind_cleaned <- wind$WSDBuoy_30min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(buoyWindSpeedMean))) %>%
   summarise(buoyWindSpeedMean = mean(buoyWindSpeedMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, buoyWindSpeedMean)
+  select(siteID, date, hour, buoyWindSpeedMean)
   
-sensorData <- sensorData %>% 
-  merge(wind_cleaned, by=c("startDateTime", "siteID"))
+sensorData <- merge(oxy_cleaned, wind_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging pressure data
 ```{r}
-pressure_cleaned <- pressure$BP_30min %>%
+pressure_cleaned <- pressure %>%
   select(siteID, startDateTime, staPresMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -157,18 +143,15 @@ pressure_cleaned <- pressure$BP_30min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(staPresMean))) %>%
   summarise(staPresMean = mean(staPresMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, staPresMean)
+  select(siteID, date, hour, staPresMean)
   
 sensorData <- sensorData %>% 
-  merge(pressure_cleaned, by=c("startDateTime", "siteID"))
+  merge(pressure_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging temperature data
 ```{r}
-temperature_cleaned <- temperature$RHbuoy_30min %>%
+airT_cleaned <- airT %>%
   select(siteID, startDateTime, tempRHMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -176,18 +159,15 @@ temperature_cleaned <- temperature$RHbuoy_30min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(tempRHMean))) %>%
   summarise(tempRHMean = mean(tempRHMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, tempRHMean)
+  select(siteID, date, hour, tempRHMean)
   
 sensorData <- sensorData %>% 
-  merge(temperature_cleaned, by=c("startDateTime", "siteID"))
+  merge(airT_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging surface water radiation data thats relevant to photosynthesis
 ```{r}
-par_surface_cleaned <- par_surface$PARWS_30min %>%
+PARsurf_cleaned <- PARsurf %>%
   select(siteID, startDateTime, PARMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -195,18 +175,15 @@ par_surface_cleaned <- par_surface$PARWS_30min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(PARMean))) %>%
   summarise(PARMean = mean(PARMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, PARMean)
+  select(siteID, date, hour, PARMean)
   
 sensorData <- sensorData %>% 
-  merge(par_surface_cleaned, by=c("startDateTime", "siteID"))
+  merge(PARsurf_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging below water radiation data thats relevant to photosynthesis
 ```{r}
-par_below_cleaned <- par_below$uPAR_30min %>%
+PARbelow_cleaned <- PARbelow %>%
   select(siteID, startDateTime, uPARMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -214,18 +191,15 @@ par_below_cleaned <- par_below$uPAR_30min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(uPARMean))) %>%
   summarise(uPARMean = mean(uPARMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, uPARMean)
+  select(siteID, date, hour, uPARMean)
   
 sensorData <- sensorData %>% 
-  merge(par_below_cleaned, by=c("startDateTime", "siteID"))
+  merge(PARbelow_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging elevation data
 ```{r}
-elevation_surface_cleaned <- elevation_surface$EOS_30_min %>%
+elevSurf_cleaned <- elevSurf %>%
   select(siteID, startDateTime, surfacewaterElevMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -233,18 +207,15 @@ elevation_surface_cleaned <- elevation_surface$EOS_30_min %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(surfacewaterElevMean))) %>%
   summarise(surfacewaterElevMean = mean(surfacewaterElevMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, surfacewaterElevMean)
+  select(siteID, date, hour, surfacewaterElevMean)
   
 sensorData <- sensorData %>% 
-  merge(elevation_surface_cleaned, by=c("startDateTime", "siteID"))
+  merge(elevSurf_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging groundwater temp data
 ```{r}
-groundwater_temp_cleaned <- groundwater_temp$TGW_30_minute %>%
+waterT_cleaned <- waterT %>%
   select(siteID, startDateTime, groundwaterTempMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -252,17 +223,14 @@ groundwater_temp_cleaned <- groundwater_temp$TGW_30_minute %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(groundwaterTempMean))) %>%
   summarise(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, groundwaterTempMean)
+  select(siteID, date, hour, groundwaterTempMean)
   
 sensorData <- sensorData %>% 
-  merge(groundwater_temp_cleaned, by=c("startDateTime", "siteID"))
+  merge(waterT_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 ```{r}
-nitrate_surface_cleaned <- nitrate_surface$NSW_15_minute %>%
+nitrate_cleaned <- nitrate %>%
   select(siteID, startDateTime, surfWaterNitrateMean) %>%
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
@@ -270,36 +238,34 @@ nitrate_surface_cleaned <- nitrate_surface$NSW_15_minute %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(surfWaterNitrateMean))) %>%
   summarise(surfWaterNitrateMean = mean(surfWaterNitrateMean, na.rm = TRUE))  %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, surfWaterNitrateMean)
+  select(siteID, date, hour, surfWaterNitrateMean)
   
 sensorData <- sensorData %>% 
-  merge(nitrate_surface_cleaned, by=c("startDateTime", "siteID"))
+  merge(nitrate_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 
 ```{r}
 cleanedData <- sensorData %>%
-  select(startDateTime, siteID, dissolvedOxygen, TFPrecipBulk, buoyWindSpeedMean, 
+  select(date, hour, siteID, dissolvedOxygen, buoyWindSpeedMean, 
          staPresMean, tempRHMean, uPARMean, PARMean, surfacewaterElevMean,
          groundwaterTempMean, surfWaterNitrateMean)
 
-write.csv(cleanedData, file='cleaned_data.csv', row.names = FALSE)
+#write.csv(cleanedData, file='cleaned_data.csv', row.names = FALSE)
 ```
 
 # Importing CSV and plotting!
 Loading `cleanedData` csv
 ```{r}
-impCleanedData <- read.csv("cleaned_data.csv")
+#impCleanedData <- read.csv("cleaned_data.csv")
 ```
 
 Plotting variables against DO
 ```{r}
-x_names <- names(impCleanedData)[4:ncol(impCleanedData)] 
+x_names <- colnames(cleanedData)[5:ncol(cleanedData)] 
 for (i in x_names){
-  plt <- impCleanedData %>% 
+  plt <- cleanedData %>%
+    collect %>% 
     ggplot(aes_string(x = i, y = "dissolvedOxygen")) +
     geom_point()
   print(plt)
