@@ -10,69 +10,23 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(lubridate)
+
 ```
 
-This should work now!
 ```{r}
-focal_sites <- c("BARC", "POSE")
-# Will download everything the first time, and then only download updated files:
-#Water quality
-neonstore::neon_download("DP1.20288.001", site =  focal_sites, type = "basic")
-#Precipiation: NOT WORKING!
-#neonstore::neon_download("DP1.00006.001", site =  focal_sites, type = "basic")
-# Wind Speed
-neonstore::neon_download("DP1.20059.001", site =  focal_sites, type = "basic")
-# Barometric Pressure
-neonstore::neon_download("DP1.20004.001", site =  focal_sites, type = "basic")
-# Air Temperature
-neonstore::neon_download("DP1.20046.001", site =  focal_sites, type = "basic")
-# PAR at water surface
-neonstore::neon_download("DP1.20042.001", site =  focal_sites, type = "basic")
-# PAR below water surface
-neonstore::neon_download("DP1.20261.001", site =  focal_sites, type = "basic")
-# Elevation of surface water
-neonstore::neon_download("DP1.20016.001", site =  focal_sites, type = "basic")
-# Groundwater temperature
-neonstore::neon_download("DP1.20217.001", site =  focal_sites, type = "basic")
-# Nitrate in surface water
-neonstore::neon_download("DP1.20033.001", site =  focal_sites, type = "basic")
-
-
-
-# will import downloaded files into local SQL DB:
-neonstore::neon_store(product = "DP1.20288.001", type = "basic") #Water Quality
-#neonstore::neon_store(product = "DP1.00006.001", type = "basic") # Precip
-neonstore::neon_store(product = "DP1.20059.001", type = "basic") # Wind Speed
-neonstore::neon_store(product = "DP1.20004.001", type = "basic") # pressure
-neonstore::neon_store(product = "DP1.20046.001", type = "basic") # temperature
-neonstore::neon_store(product = "DP1.20042.001", type = "basic") # PAR surface
-neonstore::neon_store(product = "DP1.20261.001", type = "basic") # PAR below
-neonstore::neon_store(product = "DP1.20016.001", type = "basic") # Elevation of surface water
-neonstore::neon_store(product = "DP1.20217.001", type = "basic") # Groundwater temperature
-neonstore::neon_store(product = "DP1.20033.001", type = "basic") # Nitrate
-
 
 # Use a remote connection, so `dplyr` operations can be run by SQL:
-waq_con <- neon_db()
-waq <- tbl(waq_con, "waq_instantaneous-basic")
-#precip_con <- neon_db()
+db <- neon_db()
+waq <- tbl(db, "waq_instantaneous-basic-DP1.20288.001")
 # precip <- 
-wind_con <- neon_db()
-wind <- tbl(wind_con, "WSDBuoy_30min-basic")
-pressure_con <- neon_db()
-pressure <- tbl(pressure_con, "BP_30min-basic")
-airT_con <- neon_db()
-airT <- tbl(airT_con, "RHbuoy_30min-basic")
-PARsurf_con <- neon_db()
-PARsurf <- tbl(PARsurf_con, "PARWS_30min-basic")
-PARbelow_con <- neon_db() 
-PARbelow <- tbl(PARbelow_con, "uPAR_30min-basic")
-elevSurf_con <- neon_db()
-elevSurf <- tbl(elevSurf_con, "EOS_30_min-basic")
-waterT_con <- neon_db()
-waterT <- tbl(waterT_con, "TGW_30_minute-basic")
-nitrate_con <- neon_db()
-nitrate <- tbl(nitrate_con, "NSW_15_minute-basic")
+wind <- tbl(db, "WSDBuoy_30min-basic-DP1.20059.001")
+pressure <- tbl(db, "BP_30min-basic-DP1.20004.001")
+airT <- tbl(db, "RHbuoy_30min-basic-DP1.20046.001")
+PARsurf <- tbl(db, "PARWS_30min-basic-DP1.20042.001")
+PARbelow <- tbl(db, "uPAR_30min-basic-DP1.20261.001")
+elevSurf <- tbl(db, "EOS_30_min-basic-DP1.20016.001")
+waterT <- tbl(db, "TGW_30_minute-basic-DP1.20217.001")
+nitrate <- tbl(db, "NSW_15_minute-basic-DP1.20033.001")
 ```
 
 The rest is not going to work now! TO BE UPDATED! 
@@ -86,8 +40,7 @@ oxy_cleaned <- waq %>%
   mutate(date = as_date(startDateTime),
                 hour = hour(startDateTime)) %>%
   group_by(siteID, date, hour) %>%
-  summarise(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE)) %>%
-  select(siteID, date, hour, dissolvedOxygen)
+  summarise(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE)) 
 ```
 
 Cleaning up precipitation data and merging with DO table. There is no precipitation data for the 2 sites -- NEONUtilities grabbed from proximal sites.
@@ -110,7 +63,7 @@ Cleaning up precipitation data and merging with DO table. There is no precipitat
 #   dplyr::select(siteID, startDateTime, TFPrecipBulk) %>%
 #   dplyr::mutate(siteID = site_change(siteID))
 # 
-# sensorData <- merge(oxy_cleaned, precipitation_cleaned, by=c("startDateTime", "siteID"))
+# sensorData <- inner_join(oxy_cleaned, precipitation_cleaned, by=c("startDateTime", "siteID"))
 ```
 
 Cleaning up and merging wind data
@@ -125,7 +78,7 @@ wind_cleaned <- wind %>%
   summarise(buoyWindSpeedMean = mean(buoyWindSpeedMean, na.rm = TRUE))  %>%
   select(siteID, date, hour, buoyWindSpeedMean)
   
-sensorData <- merge(oxy_cleaned, wind_cleaned, by=c("date", "hour", "siteID"))
+sensorData <- inner_join(oxy_cleaned, wind_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging pressure data
@@ -141,7 +94,7 @@ pressure_cleaned <- pressure %>%
   select(siteID, date, hour, staPresMean)
   
 sensorData <- sensorData %>% 
-  merge(pressure_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(pressure_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging temperature data
@@ -157,7 +110,7 @@ airT_cleaned <- airT %>%
   select(siteID, date, hour, tempRHMean)
   
 sensorData <- sensorData %>% 
-  merge(airT_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(airT_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging surface water radiation data thats relevant to photosynthesis
@@ -173,7 +126,7 @@ PARsurf_cleaned <- PARsurf %>%
   select(siteID, date, hour, PARMean)
   
 sensorData <- sensorData %>% 
-  merge(PARsurf_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(PARsurf_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging below water radiation data thats relevant to photosynthesis
@@ -185,11 +138,10 @@ PARbelow_cleaned <- PARbelow %>%
          hour = hour(startDateTime)) %>%
   group_by(siteID, date, hour) %>%
   filter(!(is.na(uPARMean))) %>%
-  summarise(uPARMean = mean(uPARMean, na.rm = TRUE))  %>%
-  select(siteID, date, hour, uPARMean)
+  summarise(uPARMean = mean(uPARMean, na.rm = TRUE))
   
 sensorData <- sensorData %>% 
-  merge(PARbelow_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(PARbelow_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging elevation data
@@ -205,7 +157,7 @@ elevSurf_cleaned <- elevSurf %>%
   select(siteID, date, hour, surfacewaterElevMean)
   
 sensorData <- sensorData %>% 
-  merge(elevSurf_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(elevSurf_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 Cleaning up and merging groundwater temp data
@@ -221,7 +173,7 @@ waterT_cleaned <- waterT %>%
   select(siteID, date, hour, groundwaterTempMean)
   
 sensorData <- sensorData %>% 
-  merge(waterT_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(waterT_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 ```{r}
@@ -236,7 +188,7 @@ nitrate_cleaned <- nitrate %>%
   select(siteID, date, hour, surfWaterNitrateMean)
   
 sensorData <- sensorData %>% 
-  merge(nitrate_cleaned, by=c("date", "hour", "siteID"))
+  inner_join(nitrate_cleaned, by=c("date", "hour", "siteID"))
 ```
 
 
@@ -257,7 +209,7 @@ Loading `cleanedData` csv
 
 Plotting variables against DO
 ```{r}
-plot <- cleanedData %>%
+plot <- cleanedData %>% collect() %>%
   pivot_longer(colnames(cleanedData)[5:ncol(cleanedData)], names_to = "Driver", values_to = "Obs") %>% 
   ggplot() +
   geom_point(mapping = aes(x = Obs, y = dissolvedOxygen)) +
