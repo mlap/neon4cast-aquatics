@@ -21,8 +21,7 @@ library(lubridate)
 Everything is the same here but we have to tell neon to use the shared data from
 minio in the first 2 lines.
 ```{r}
-Sys.setenv(NEONSTORE_HOME="/minio/neonstore")
-Sys.setenv("NEONSTORE_DB"="/minio/neonstore")
+Sys.setenv(NEONSTORE_HOME="/minio/neonstore", NEONSTORE_DB="/minio/neonstore")
 # Use a remote connection, so `dplyr` operations can be run by SQL:
 db <- neon_db()
 waq <- tbl(db, "waq_instantaneous-basic-DP1.20288.001")
