@@ -2,19 +2,26 @@
 title: "exploration"
 output: html_document
 ---
+To download neonstore without getting any errors because of firewalls
+```{r}
+devtools::install_github("richfitz/thor")
+devtools::install_github("richfitz/storr")
+devtools::install_github("cboettig/neonstore")
+```
 
-# In this first Part, I import all the relevant data from NEON;  data exploration stuff starts at line 241 
+
 ```{r}
 library(neonstore)
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(lubridate)
-
 ```
 
+Everything is the same here but we have to tell neon to use the shared data from
+minio in the first 2 lines.
 ```{r}
-
+Sys.setenv(NEONSTORE_HOME="/minio/neonstore", NEONSTORE_DB="/minio/neonstore")
 # Use a remote connection, so `dplyr` operations can be run by SQL:
 db <- neon_db()
 waq <- tbl(db, "waq_instantaneous-basic-DP1.20288.001")
@@ -29,7 +36,6 @@ waterT <- tbl(db, "TGW_30_minute-basic-DP1.20217.001")
 nitrate <- tbl(db, "NSW_15_minute-basic-DP1.20033.001")
 ```
 
-The rest is not going to work now! TO BE UPDATED! 
 
 Tidying up DO data, for exploration purposes I'm only going to look at the means here on but for forecasting, dealing with uncertainty will probably be the way to go. Note that the water quality data has potentially more important drivers like chlorophyll, turbidity and pH.
 ```{r}
