@@ -50,11 +50,13 @@ def solver_FE_simple(I, a, f, L, dt, F, T):
     import time;  t0 = time.time()  # For measuring the CPU time
 
     Nt = int(round(T/float(dt)))
-    t = np.linspace(0, Nt*dt, Nt+1)   # Mesh points in time
+    t = np.linspace(0, Nt*dt, Nt+1) # Mesh points in time
+    
     dx = np.sqrt(a*dt/F)
     Nx = int(round(L/dx))
     x = np.linspace(0, L, Nx+1)       # Mesh points in space
     # Make sure dx and dt are compatible with x and t
+    import pdb; pdb.set_trace()
     dx = x[1] - x[0]
     dt = t[1] - t[0]
 
@@ -64,22 +66,24 @@ def solver_FE_simple(I, a, f, L, dt, F, T):
     # Set initial condition u(x,0) = I(x)
     for i in range(0, Nx+1):
         u_n[i] = I(x[i])
-
-    for n in range(0, Nt):
-        # Compute u at inner mesh points
+    t_series = []
+    for n_t in range(0, Nt):
+        # Compute u at inner mesh points. Changed this from original to 
+        # iterate over index time index n_t rather than t[n]
         for i in range(1, Nx):
             u[i] = u_n[i] + F*(u_n[i-1] - 2*u_n[i] + u_n[i+1]) + \
-                   dt*f(x[i], t[n])
+                   dt*f(x[i], n_t)
 
         # Insert boundary conditions
         u[0] = 0;  u[Nx] = 0
+        t_series.append(u)
 
         # Switch variables before next step
         #u_n[:] = u  # safe, but slow
         u_n, u = u, u_n
 
     t1 = time.time()
-    return u_n, x, t, t1-t0  # u_n holds latest u
+    return t_series, x, t, t1-t0  # u_n holds latest u
 
 
 def solver_FE(I, a, f, L, dt, F, T,
