@@ -28,8 +28,14 @@ def main():
       test_inputs = np.append(test_inputs, model(seq).numpy().reshape(1,-1)).reshape(-1, 4)
   
   actual_predictions = scaler.inverse_transform(test_inputs[train_window:])
-  plt.plot(np.linspace(1, 28, 28), training_data[["dissolvedOxygen"]])
-  plt.plot(np.linspace(21, 28, 7), actual_predictions[:, 2])
+  fig, axs = plt.subplots(2)
+  axs[0].plot(np.linspace(1, 28, 28), training_data[["dissolvedOxygen"]])
+  axs[0].plot(np.linspace(21, 28, 7), actual_predictions[:, 2])
+  axs[0].set_title("DO")
+  axs[1].plot(np.linspace(1, 28, 28), training_data[["groundwaterTempMean"]])
+  axs[1].plot(np.linspace(21, 28, 7), actual_predictions[:, 0])
+  axs[1].set_title("Groundwater Temp")
+  plt.xlabel("Day")
   plt.savefig("trash.png")
 
 if __name__ == "__main__":
