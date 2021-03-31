@@ -47,8 +47,8 @@ oxy_cleaned <- waq %>%
          month = month(startDateTime),
          year = year(startDateTime),
          day = day(startDateTime)) %>%
-  group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE)) %>% 
+  group_by(siteID, month, day, year) %>% 
+  summarize(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE), .groups="drop") %>% 
   filter(siteID == "BARC") %>% 
   select(month, day, year, dissolvedOxygen) 
 ```
@@ -65,7 +65,7 @@ chla_cleaned <- waq %>%
          year = year(startDateTime),
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(chlorophyll = mean(chlorophyll, na.rm = TRUE)) %>% 
+  summarize(chlorophyll = mean(chlorophyll, na.rm = TRUE), .groups="drop") %>% 
   filter(siteID == "BARC") %>% 
   select(month, day, year, chlorophyll) 
 ```
@@ -81,7 +81,7 @@ waterT_cleaned <- waterT %>%
          year = year(startDateTime),
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE)) %>% 
+  summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
   filter(siteID == "BARC") %>% 
   select(month, day, year, groundwaterTempMean) 
 ```
@@ -97,7 +97,7 @@ PARbelow_cleaned <- PARbelow %>%
          year = year(startDateTime),
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(uPARMean = mean(uPARMean, na.rm = TRUE)) %>% 
+  summarize(uPARMean = mean(uPARMean, na.rm = TRUE), .groups="drop") %>% 
   filter(siteID == "BARC") %>% 
   select(month, day, year, uPARMean) 
 ```
@@ -107,4 +107,8 @@ csv <- inner_join(oxy_cleaned, chla_cleaned, by=c("month", "day", "year"))
 csv <- waterT_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
 csv <- PARbelow_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
 write.csv(csv, "minlake_test.csv")
+```
+
+```{r}
+oxy_cleaned %>% filter(month==1, year == 2021) %>% head() %>% ggplot()
 ```
