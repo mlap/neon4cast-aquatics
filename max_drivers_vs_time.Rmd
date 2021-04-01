@@ -1,0 +1,249 @@
+---
+title: "max_drivers_vs_time"
+output: pdf_document
+---
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(forcats)
+library(hrbrthemes)
+library(textclean)
+library(xts)
+
+setwd("/home/aquatic_max/neon4cast-aquatics/neon4cast-aquatics")
+
+cleaned_data <- read.csv("~/neon4cast-aquatics/neon4cast-aquatics/data_exploration/cleaned_data.csv")
+
+#colnames(cleaned_data)
+ # "startDateTime"        "siteID"               "dissolvedOxygen"      "TFPrecipBulk"         "buoyWindSpeedMean"    "staPresMean"         
+ # "tempRHMean"           "uPARMean"             "PARMean"              "surfacewaterElevMean" "groundwaterTempMean"  "surfWaterNitrateMean"
+
+
+```
+
+
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Add month and year string columns
+
+#  Convert to date if not already
+cleaned_data$startDateTime <- as.Date(cleaned_data$startDateTime)
+
+#  Get months
+cleaned_data$Month <- substring(cleaned_data$startDateTime,6,7)
+
+#  Get years
+cleaned_data$Year <- substring(cleaned_data$startDateTime,1,4)
+
+#Combine the Month and Year Column for graphing prep
+cleaned_data$month_year <- as.yearmon(paste(cleaned_data$Month, cleaned_data$Year), "%m %Y")
+
+
+#  Aggregate column of interest based on each month through time and get mean
+monthly_avg_dissolvedOxygen <- aggregate(dissolvedOxygen ~ month_year, cleaned_data , mean )
+monthly_avg_TFPrecipBulk <- aggregate(TFPrecipBulk ~ month_year, cleaned_data , mean )
+monthly_avg_buoyWindSpeedMean <- aggregate(buoyWindSpeedMean ~ month_year, cleaned_data , mean )
+monthly_avg_staPresMean <- aggregate(staPresMean ~ month_year, cleaned_data , mean )
+monthly_avg_tempRHMean <- aggregate(tempRHMean ~ month_year, cleaned_data , mean )
+monthly_avg_uPARMean <- aggregate(uPARMean ~ month_year, cleaned_data , mean )
+monthly_avg_PARMean <- aggregate(PARMean ~ month_year, cleaned_data , mean )
+monthly_avg_surfacewaterElevMean <- aggregate(surfacewaterElevMean ~ month_year, cleaned_data , mean )
+monthly_avg_groundwaterTempMean <- aggregate(groundwaterTempMean ~ month_year, cleaned_data , mean )
+monthly_avg_surfWaterNitrateMean <- aggregate(surfWaterNitrateMean ~ month_year, cleaned_data , mean )
+
+# Multiyear monthly averages
+yearly_avg_dissolvedOxygen <- aggregate(dissolvedOxygen ~ Month, cleaned_data , mean )
+yearly_avg_TFPrecipBulk <- aggregate(TFPrecipBulk ~ Month, cleaned_data , mean )
+yearly_avg_buoyWindSpeedMean <- aggregate(buoyWindSpeedMean ~ Month, cleaned_data , mean )
+yearly_avg_staPresMean <- aggregate(staPresMean ~ Month, cleaned_data , mean )
+yearly_avg_tempRHMean <- aggregate(tempRHMean ~ Month, cleaned_data , mean )
+yearly_avg_uPARMean <- aggregate(uPARMean ~ Month, cleaned_data , mean )
+yearly_avg_PARMean <- aggregate(PARMean ~ Month, cleaned_data , mean )
+yearly_avg_surfacewaterElevMean <- aggregate(surfacewaterElevMean ~ Month, cleaned_data , mean )
+yearly_avg_groundwaterTempMean <- aggregate(groundwaterTempMean ~ Month, cleaned_data , mean )
+yearly_avg_surfWaterNitrateMean <- aggregate(surfWaterNitrateMean ~ Month, cleaned_data , mean )
+
+```
+
+## dissolvedOxygen
+### Highest DO at start of year, decreases through November
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_dissolvedOxygen, aes(x=month_year, y=dissolvedOxygen))+
+  geom_point(aes(color = dissolvedOxygen),size = 3)+
+  labs(title = "Average Dissolved Oxygen per Month",subtitle = "Sourced from NEON",y= "Dissolved Oxygen",x="Month & Year", color="DO Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_dissolvedOxygen, aes(x=fct_inorder(Month), y=dissolvedOxygen))+
+  geom_point(aes(color = dissolvedOxygen),size = 3)+
+  labs(title = "Multiyear Monthly Avg for Dissolved Oxygen",subtitle = "Sourced from NEON",y= "Dissolved Oxygen",x="Month", color="DO Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+## TFPrecipBulk
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_TFPrecipBulk, aes(x=month_year, y=TFPrecipBulk))+
+  geom_point(aes(color = TFPrecipBulk),size = 3)+
+  labs(title = "Average TFPrecipBulk per Month",subtitle = "Sourced from NEON",y= "TFPrecipBulk",x="Month & Year", color="TFPrecipBulk Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_TFPrecipBulk, aes(x=fct_inorder(Month), y=TFPrecipBulk))+
+  geom_point(aes(color = TFPrecipBulk),size = 3)+
+  labs(title = "Multiyear Monthly Avg for TFPrecipBulk",subtitle = "Sourced from NEON",y= "TFPrecipBulk",x="Month", color="TFPrecipBulk Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## buoyWindSpeedMean
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_buoyWindSpeedMean, aes(x=month_year, y=buoyWindSpeedMean))+
+  geom_point(aes(color = buoyWindSpeedMean),size = 3)+
+  labs(title = "Average buoyWindSpeedMean per Month",subtitle = "Sourced from NEON",y= "buoyWindSpeedMean",x="Month & Year", color="buoyWindSpeedMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_buoyWindSpeedMean, aes(x=fct_inorder(Month), y=buoyWindSpeedMean))+
+  geom_point(aes(color = buoyWindSpeedMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for buoyWindSpeedMean",subtitle = "Sourced from NEON",y= "buoyWindSpeedMean",x="Month", color="buoyWindSpeedMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## staPresMean
+### Strong Summer/Winter data separation
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_staPresMean, aes(x=month_year, y=staPresMean))+
+  geom_point(aes(color = staPresMean),size = 3)+
+  labs(title = "Average staPresMean per Month",subtitle = "Sourced from NEON",y= "staPresMean",x="Month & Year", color="staPresMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_staPresMean, aes(x=fct_inorder(Month), y=staPresMean))+
+  geom_point(aes(color = staPresMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for staPresMean",subtitle = "Sourced from NEON",y= "staPresMean",x="Month", color="staPresMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## tempRHMean
+### Summer increase
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_tempRHMean, aes(x=month_year, y=tempRHMean))+
+  geom_point(aes(color = tempRHMean),size = 3)+
+  labs(title = "Average tempRHMean per Month",subtitle = "Sourced from NEON",y= "tempRHMean",x="Month & Year", color="tempRHMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_tempRHMean, aes(x=fct_inorder(Month), y=tempRHMean))+
+  geom_point(aes(color = tempRHMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for tempRHMean",subtitle = "Sourced from NEON",y= "tempRHMean",x="Month", color="tempRHMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## uPARMean
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_uPARMean, aes(x=month_year, y=uPARMean))+
+  geom_point(aes(color = uPARMean),size = 3)+
+  labs(title = "Average uPARMean per Month",subtitle = "Sourced from NEON",y= "uPARMean",x="Month & Year", color="uPARMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_uPARMean, aes(x=fct_inorder(Month), y=uPARMean))+
+  geom_point(aes(color = uPARMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for uPARMean",subtitle = "Sourced from NEON",y= "uPARMean",x="Month", color="uPARMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## PARMean
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_PARMean, aes(x=month_year, y=PARMean))+
+  geom_point(aes(color = PARMean),size = 3)+
+  labs(title = "Average PARMean per Month",subtitle = "Sourced from NEON",y= "PARMean",x="Month & Year", color="PARMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_PARMean, aes(x=fct_inorder(Month), y=PARMean))+
+  geom_point(aes(color = PARMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for PARMean",subtitle = "Sourced from NEON",y= "PARMean",x="Month", color="PARMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## surfacewaterElevMean
+### Decrease in surface water elev through time
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_surfacewaterElevMean, aes(x=month_year, y=surfacewaterElevMean))+
+  geom_point(aes(color = surfacewaterElevMean),size = 3)+
+  labs(title = "Average surfacewaterElevMean per Month",subtitle = "Sourced from NEON",y= "surfacewaterElevMean",x="Month & Year", color="surfacewaterElevMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_surfacewaterElevMean, aes(x=fct_inorder(Month), y=surfacewaterElevMean))+
+  geom_point(aes(color = surfacewaterElevMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for surfacewaterElevMean",subtitle = "Sourced from NEON",y= "surfacewaterElevMean",x="Month", color="surfacewaterElevMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## groundwaterTempMean
+### Steady increase in groundwater temp through time
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_groundwaterTempMean, aes(x=month_year, y=groundwaterTempMean))+
+  geom_point(aes(color = groundwaterTempMean),size = 3)+
+  labs(title = "Average groundwaterTempMean per Month",subtitle = "Sourced from NEON",y= "groundwaterTempMean",x="Month & Year", color="groundwaterTempMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_groundwaterTempMean, aes(x=fct_inorder(Month), y=groundwaterTempMean))+
+  geom_point(aes(color = groundwaterTempMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for groundwaterTempMean",subtitle = "Sourced from NEON",y= "groundwaterTempMean",x="Month", color="groundwaterTempMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
+
+## surfWaterNitrateMean
+### Slight increase in nitrate through time
+```{r, echo = FALSE, message = FALSE, warning= FALSE}
+#Average Mean Per Month
+ggplot(monthly_avg_surfWaterNitrateMean, aes(x=month_year, y=surfWaterNitrateMean))+
+  geom_point(aes(color = surfWaterNitrateMean),size = 3)+
+  labs(title = "Average surfWaterNitrateMean per Month",subtitle = "Sourced from NEON",y= "surfWaterNitrateMean",x="Month & Year", color="surfWaterNitrateMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+
+#Multiyear Monthly Average
+ggplot(yearly_avg_surfWaterNitrateMean, aes(x=fct_inorder(Month), y=surfWaterNitrateMean))+
+  geom_point(aes(color = surfWaterNitrateMean),size = 3)+
+  labs(title = "Multiyear Monthly Avg for surfWaterNitrateMean",subtitle = "Sourced from NEON",y= "surfWaterNitrateMean",x="Month", color="surfWaterNitrateMean Level")+
+  theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust=1))
+
+```
