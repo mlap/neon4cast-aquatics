@@ -7,9 +7,9 @@ from sklearn.preprocessing import MinMaxScaler
 from copy import deepcopy
 from rnn_utils import *
 
-def main():
+def main(filename_num):
   df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-  
+    
   training_data = df[["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]].loc[:28]
   # Normalizing data to -1, 1 scale; this improves performance of neural nets
   scaler = MinMaxScaler(feature_range=(-1, 1))
@@ -20,7 +20,7 @@ def main():
   loss_function = nn.MSELoss()
   optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
   
-  epochs = 150
+  epochs = 300
   train_window=7
   train_seq = create_sequence(training_data_normalized, train_window)
 
@@ -42,7 +42,10 @@ def main():
   
   print(f'epoch: {i:3} loss: {single_loss.item():10.10f}')
 
-  torch.save(model, "./trash_model.pkl")
+  torch.save(model, f"models/trash_model{filename_num}.pkl")
 
 if __name__ == "__main__":
-  main()
+  torch.cuda.set_device(0)
+  print("Active Cuda Device: GPU ", torch.cuda.current_device())
+  for i in range(10):
+    main(i)
