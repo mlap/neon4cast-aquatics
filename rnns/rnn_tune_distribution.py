@@ -12,7 +12,7 @@ import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
-parser.add_argument("--study-name", type=str, help="Study name")
+parser.add_argument("--study-name", type=str, default="trash", help="Study name")
 parser.add_argument("--n-trials", type=int, default=int(25),
                     help="Number of tuning trials")
 args = parser.parse_args()
@@ -21,7 +21,7 @@ args = parser.parse_args()
 def get_params(trial):
     params = {
         'learning_rate': trial.suggest_loguniform('learning_rate', 1e-5, 1),
-        'train_window': trial.suggest_categorical('train_window', [1, 7, 14, 21]),
+        'train_window': trial.suggest_categorical('train_window', [7, 14, 21]),
         'lstm_width': trial.suggest_categorical('lstm_width', [64, 128, 256, 512]),
         'hidden_width': trial.suggest_categorical('hidden_width', [64, 128, 256, 512]),
     }
@@ -30,10 +30,9 @@ def get_params(trial):
 
 
 def score_model(model, params):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-
+    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
-                        "dissolvedOxygen", "chlorophyll"]].loc[:28]
+                        "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
@@ -46,20 +45,13 @@ def score_model(model, params):
         means = np.array([])
         stds = np.array([])
         model.eval()
+        model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
+                                     torch.zeros(1, 1, model.hidden_layer_size))
         for i in range(fut_pred):
             seq = torch.FloatTensor(test_inputs[-train_window:])
             with torch.no_grad():
-                model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
-                                     torch.zeros(1, 1, model.hidden_layer_size))
-                y_pred = model(seq)
-                mu = y_pred[:4]
-                var = torch.abs(y_pred[4:8])
-                covs = y_pred[-6:]
-                cov_matrix = build_cov_matrix(var, covs)
-                #import pdb; pdb.set_trace()
-                dist = MultivariateNormal(mu, cov_matrix)
-                #import pdb; pdb.set_trace()
-                samples = dist.rsample((10,))
+                dist = build_dist(model, seq)
+                samples = dist.rsample((100,))
                 test_inputs = np.append(test_inputs, samples.mean(
                     axis=0).numpy()).reshape(-1, 4)
 
@@ -67,9 +59,6 @@ def score_model(model, params):
                     samples).mean(axis=0)).reshape(-1, 4)
 
         all_predictions.append(means)
-    means = np.array(all_predictions).mean(axis=0)
-    stds = np.array(all_predictions).std(axis=0)
-
     means = np.array(all_predictions).mean(axis=0)
     stds = np.array(all_predictions).std(axis=0)
     DO_targets = training_data[["dissolvedOxygen"]
@@ -85,9 +74,9 @@ def score_model(model, params):
 
 def train_model(params):
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-
+    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
-                        "dissolvedOxygen", "chlorophyll"]].loc[:28]
+                        "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
@@ -97,25 +86,19 @@ def train_model(params):
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params['learning_rate'])
 
-    epochs = 150
+    epochs = 100
     train_window = params['train_window']
 
     train_seq = create_sequence(training_data_normalized, train_window)
 
     for i in range(epochs):
+        model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
+                                 torch.zeros(1, 1, model.hidden_layer_size))
         for seq, targets in train_seq:
             optimizer.zero_grad()
-            model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
-                                 torch.zeros(1, 1, model.hidden_layer_size))
             model.float()
             seq = torch.from_numpy(seq)
-            y_pred = model(seq).view(-1)
-            mu = y_pred[:4]
-            var = torch.abs(y_pred[4:8])
-            covs = y_pred[-6:]
-            cov_matrix = build_cov_matrix(var, covs)
-            #import pdb; pdb.set_trace()
-            dist = MultivariateNormal(mu, cov_matrix)
+            dist = build_dist(model, seq)
 
             targets = torch.from_numpy(targets).view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)
@@ -135,33 +118,6 @@ def objective(trial):
 
     return objective
 
-
-def build_cov_matrix(var, covs):
-    """
-    This function builds a covariance matrix from variates and covariates
-    """
-    cov_mat = torch.diag(var)
-    cov_mat[0, 1] = 0
-    cov_mat[1, 0] = covs[0]
-    cov_mat[0, 2] = 0
-    cov_mat[2, 0] = covs[1]
-    cov_mat[0, 3] = 0
-    cov_mat[3, 0] = covs[2]
-    cov_mat[1, 2] = 0
-    cov_mat[2, 1] = covs[3]
-    cov_mat[1, 3] = 0
-    cov_mat[3, 1] = covs[4]
-    cov_mat[2, 3] = 0
-    cov_mat[3, 2] = covs[5]
-    # Enforcing matrix to be PD
-    cov_mat = torch.mm(cov_mat, cov_mat.t())
-    cov_mat.add_(torch.eye(len(cov_mat)))
-    try:
-        np.linalg.cholesky(cov_mat.detach().numpy())
-        return cov_mat
-    except:
-        import pdb
-        pdb.set_trace()
 
 
 if __name__ == "__main__":
