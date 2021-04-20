@@ -10,6 +10,7 @@ from copy import deepcopy
 # This function preprocesses data to create a training sequences and corresponding
 # DO targets
 
+
 def create_sequence(input_data, train_window):
     seq = []
     L = len(input_data)
@@ -19,6 +20,7 @@ def create_sequence(input_data, train_window):
         seq.append((train_seq, train_target))
 
     return seq
+
 
 def build_cov_matrix(var, covs):
     """
@@ -45,6 +47,7 @@ def build_cov_matrix(var, covs):
         return cov_mat
     except:
         print("Cov matrix error :(")
+
 
 def build_dist(model, seq):
     y_pred = model(seq).view(-1)

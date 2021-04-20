@@ -12,9 +12,13 @@ import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
-parser.add_argument("--study-name", type=str, default="trash", help="Study name")
+parser.add_argument("--study-name", type=str,
+                    default="trash", help="Study name")
 parser.add_argument("--n-trials", type=int, default=int(25),
                     help="Number of tuning trials")
+parser.add_argument("--epochs", type=int, default=1, help="Number of Epochs")
+parser.add_argument("--prediction-window", type=int, default=7,
+                    help="How many days in advance to predict")
 args = parser.parse_args()
 
 
@@ -30,51 +34,54 @@ def get_params(trial):
 
 
 def score_model(model, params):
-    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
+    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = df[df.year > 2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
                         "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
-    fut_pred = 7
+    fut_pred = args.prediction_window
     train_window = params['train_window']
     all_predictions = []
     test_inputs = training_data_normalized[-train_window -
                                            fut_pred:-fut_pred]
-    for i in range(10):
-        means = np.array([])
-        stds = np.array([])
+    for i in range(1):
+        medians = np.array([])
+        bottom = np.array([])
+        top = np.array([])
         model.eval()
         model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
-                                     torch.zeros(1, 1, model.hidden_layer_size))
+                             torch.zeros(1, 1, model.hidden_layer_size))
         for i in range(fut_pred):
             seq = torch.FloatTensor(test_inputs[-train_window:])
             with torch.no_grad():
                 dist = build_dist(model, seq)
-                samples = dist.rsample((100,))
-                test_inputs = np.append(test_inputs, samples.mean(
-                    axis=0).numpy()).reshape(-1, 4)
+                samples = dist.rsample((1000,))
+                scaled_samples = scaler.inverse_transform(samples)
+                medians = np.append(medians, np.percentile(
+                    scaled_samples, 50, axis=0)).reshape(-1, 4)
+                bottom = np.append(bottom, np.percentile(
+                    scaled_samples, 30, axis=0)).reshape(-1, 4)
+                top = np.append(top, np.percentile(
+                    scaled_samples, 70, axis=0)).reshape(-1, 4)
 
-                means = np.append(means, scaler.inverse_transform(
-                    samples).mean(axis=0)).reshape(-1, 4)
-
-        all_predictions.append(means)
-    means = np.array(all_predictions).mean(axis=0)
-    stds = np.array(all_predictions).std(axis=0)
     DO_targets = training_data[["dissolvedOxygen"]
                                ][-fut_pred:].to_numpy().reshape(-1)
     WT_targets = training_data[["groundwaterTempMean"]
                                ][-fut_pred:].to_numpy().reshape(-1)
-    objective = ((means[:, 2] - DO_targets)**2).mean() + ((means[:, 2] + stds[:, 2] - DO_targets)**2).mean() + \
-        ((means[:, 0] - WT_targets)**2).mean() + \
-        ((means[:, 0] + stds[:, 0] - WT_targets)**2).mean()
+    import pdb; pdb.set_trace()
+    objective = ((medians[:, 2] - DO_targets)**2).mean() + ((medians[:, 2] - bottom[:, 2] - DO_targets)**2).mean() + \
+        ((medians[:, 2] + top[:, 2] - DO_targets)**2).mean() + \
+        ((medians[:, 0] - WT_targets)**2).mean() + ((medians[:, 0] + top[:, 0] - WT_targets)**2).mean() + \
+        ((medians[:, 0] - bottom[:, 0] - WT_targets)**2).mean()
 
     return objective
 
 
 def train_model(params):
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
+    df = df[df.year > 2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
                         "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
@@ -86,14 +93,14 @@ def train_model(params):
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params['learning_rate'])
 
-    epochs = 100
+    epochs = args.epochs
     train_window = params['train_window']
 
     train_seq = create_sequence(training_data_normalized, train_window)
 
     for i in range(epochs):
         model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
-                                 torch.zeros(1, 1, model.hidden_layer_size))
+                             torch.zeros(1, 1, model.hidden_layer_size))
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
@@ -102,7 +109,8 @@ def train_model(params):
 
             targets = torch.from_numpy(targets).view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)
-            model.hidden_cell = (model.hidden_cell[0].detach(), model.hidden_cell[1].detach())
+            model.hidden_cell = (
+                model.hidden_cell[0].detach(), model.hidden_cell[1].detach())
             single_loss.backward()
             optimizer.step()
 
@@ -118,7 +126,6 @@ def objective(trial):
     objective = score_model(model, params)
 
     return objective
-
 
 
 if __name__ == "__main__":
