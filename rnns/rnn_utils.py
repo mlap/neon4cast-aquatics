@@ -44,9 +44,15 @@ def build_cov_matrix(var, covs):
         np.linalg.cholesky(cov_mat.detach().numpy())
         return cov_mat
     except:
-        import pdb
-        pdb.set_trace()
+        print("Cov matrix error :(")
 
+def build_dist(model, seq):
+    y_pred = model(seq).view(-1)
+    mu = y_pred[:4]
+    var = torch.abs(y_pred[4:8])
+    covs = y_pred[-6:]
+    cov_matrix = build_cov_matrix(var, covs)
+    return MultivariateNormal(mu, cov_matrix)
 
 
 class LSTM(nn.Module):
@@ -78,11 +84,3 @@ class LSTM(nn.Module):
         out = self.fc_2(out.view(len(input_seq), -1))
         out = self.dropout(out)
         return out[-1]
-
-def build_dist(model, seq):
-    y_pred = model(seq).view(-1)
-    mu = y_pred[:4]
-    var = torch.abs(y_pred[4:8])
-    covs = y_pred[-6:]
-    cov_matrix = build_cov_matrix(var, covs)
-    return MultivariateNormal(mu, cov_matrix)

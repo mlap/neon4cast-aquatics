@@ -102,6 +102,7 @@ def train_model(params):
 
             targets = torch.from_numpy(targets).view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)
+            model.hidden_cell = (model.hidden_cell[0].detach(), model.hidden_cell[1].detach())
             single_loss.backward()
             optimizer.step()
 

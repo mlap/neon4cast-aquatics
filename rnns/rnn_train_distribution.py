@@ -16,13 +16,13 @@ def main(filename_num):
     #training_data = df[["groundwaterTempMean", "uPARMean",
     #                    "dissolvedOxygen", "chlorophyll"]]
     training_data = df[["groundwaterTempMean", "uPARMean",
-                        "dissolvedOxygen", "chlorophyll"]].loc[:8]
+                        "dissolvedOxygen", "chlorophyll"]].loc[:28]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
-    model = LSTM(input_size=4, hidden_layer_size=7,
-                 fc_size=56, output_size=14)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00007)
+    model = LSTM(input_size=4, hidden_layer_size=64,
+                 fc_size=256, output_size=14)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     epochs = 100
     train_window = 7
