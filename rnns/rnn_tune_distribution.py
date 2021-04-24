@@ -70,7 +70,6 @@ def score_model(model, params):
                                ][-fut_pred:].to_numpy().reshape(-1)
     WT_targets = training_data[["groundwaterTempMean"]
                                ][-fut_pred:].to_numpy().reshape(-1)
-    import pdb; pdb.set_trace()
     objective = ((medians[:, 2] - DO_targets)**2).mean() + ((medians[:, 2] - bottom[:, 2] - DO_targets)**2).mean() + \
         ((medians[:, 2] + top[:, 2] - DO_targets)**2).mean() + \
         ((medians[:, 0] - WT_targets)**2).mean() + ((medians[:, 0] + top[:, 0] - WT_targets)**2).mean() + \
@@ -137,7 +136,7 @@ if __name__ == "__main__":
     study = optuna.create_study(study_name=args.study_name, sampler=sampler,
                                 direction='minimize', storage=storage_name,
                                 load_if_exists=True)
-    study.optimize(objective, n_trials=25)
+    study.optimize(objective, n_trials=25, catch=(ValueError, RuntimeError))
     # Reporting best trial and making a quick plot to examine hyperparameters
     trial = study.best_trial
     print(f"Best hyperparams: {trial.params}")

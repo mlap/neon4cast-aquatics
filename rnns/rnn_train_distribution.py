@@ -14,27 +14,23 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--file-name", type=str,
                     default="trash_model_dist", help="Name to save model")
-parser.add_argument("--n-trials", type=int, default=int(25),
-parser.add_argument("--epochs", type=int, default=100, help="Number of Epochs")
+parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
 args=parser.parse_args()
 
-params={
-    'lstm_width': 64,
-    'hidden_width': 64,
-    'learning_rate': 0.001,
-    'train_window': 7,
-    }
+params = {'learning_rate': 0.00001, 
+          'train_window': 21, 
+          'lstm_width': 512, 
+          'hidden_width': 64}
 
 def main(filename_num):
     df=pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-    # df = df[df.year>2019].sort_values(['year', 'month', 'day'])
-    # training_data = df[["groundwaterTempMean", "uPARMean",
-    #                    "dissolvedOxygen", "chlorophyll"]]
-    training_data=df[["groundwaterTempMean", "uPARMean",
-                        "dissolvedOxygen", "chlorophyll"]].loc[:28]
+    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
+    training_data = df[["groundwaterTempMean", "uPARMean",
+                        "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler=MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized=scaler.fit_transform(training_data)
+    
     model=LSTM(input_size=4, hidden_layer_size=params['lstm_width'],
                  fc_size=params['hidden_width'], output_size=14)
     optimizer=torch.optim.Adam(model.parameters(), lr=params['learning_rate'])
@@ -58,7 +54,7 @@ def main(filename_num):
             single_loss.backward()
             optimizer.step()
 
-        if i % 25 == 1:
+        if i % 100 == 1:
             print(f'epoch: {i:3} loss: {single_loss.item():10.8f}')
 
     print(f'epoch: {i:3} loss: {single_loss.item():10.10f}')

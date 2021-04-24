@@ -22,17 +22,17 @@ args = parser.parse_args()
 
 
 def main():
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-    #df = df[df.year>2019].sort_values(['year', 'month', 'day'])
-    # training_data = df[["groundwaterTempMean", "uPARMean",
-    #                    "dissolvedOxygen", "chlorophyll"]]
     scaler = MinMaxScaler(feature_range=(-1, 1))
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = df[df.year>2019].sort_values(['year', 'month', 'day'])
+    import pdb; pdb.set_trace()
     training_data = df[["groundwaterTempMean", "uPARMean",
-                        "dissolvedOxygen", "chlorophyll"]].loc[:28]
+                        "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
-    training_data_normalized = scaler.fit_transform(training_data)
-    #import pdb; pdb.set_trace()
+    _ = scaler.fit(training_data)
+    training_data = df[["groundwaterTempMean", "uPARMean",
+                        "dissolvedOxygen", "chlorophyll"]]
+    training_data_normalized = scaler.transform(training_data)
     train_window = args.train_window
 
     fut_pred = args.predict_window
