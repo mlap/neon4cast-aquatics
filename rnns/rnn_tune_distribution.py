@@ -34,6 +34,7 @@ def get_params(trial):
 
 
 def score_model(model, params):
+    model.cpu()
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
     df = df[df.year > 2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
@@ -47,9 +48,8 @@ def score_model(model, params):
     test_inputs = training_data_normalized[-train_window -
                                            fut_pred:-fut_pred]
     for i in range(1):
-        medians = np.array([])
-        bottom = np.array([])
-        top = np.array([])
+        means = np.array([])
+        stds = np.array([])
         model.eval()
         model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
                              torch.zeros(1, 1, model.hidden_layer_size))
@@ -59,26 +59,22 @@ def score_model(model, params):
                 dist = build_dist(model, seq)
                 samples = dist.rsample((1000,))
                 scaled_samples = scaler.inverse_transform(samples)
-                medians = np.append(medians, np.percentile(
-                    scaled_samples, 50, axis=0)).reshape(-1, 4)
-                bottom = np.append(bottom, np.percentile(
-                    scaled_samples, 30, axis=0)).reshape(-1, 4)
-                top = np.append(top, np.percentile(
-                    scaled_samples, 70, axis=0)).reshape(-1, 4)
+                means = np.append(means, np.mean(
+                    scaled_samples, axis=0)).reshape(-1, 4)
+                stds = np.append(stds, np.std(
+                    scaled_samples, axis=0)).reshape(-1, 4)
 
     DO_targets = training_data[["dissolvedOxygen"]
                                ][-fut_pred:].to_numpy().reshape(-1)
     WT_targets = training_data[["groundwaterTempMean"]
                                ][-fut_pred:].to_numpy().reshape(-1)
-    objective = ((medians[:, 2] - DO_targets)**2).mean() + ((medians[:, 2] - bottom[:, 2] - DO_targets)**2).mean() + \
-        ((medians[:, 2] + top[:, 2] - DO_targets)**2).mean() + \
-        ((medians[:, 0] - WT_targets)**2).mean() + ((medians[:, 0] + top[:, 0] - WT_targets)**2).mean() + \
-        ((medians[:, 0] - bottom[:, 0] - WT_targets)**2).mean()
+    objective = ((means[:, 2] - DO_targets)**2).mean() + ((means[:, 2] + stds[:, 2] - DO_targets)**2).mean() + \
+        ((means[:, 0] - WT_targets)**2).mean() + ((means[:, 0] + stds[:, 0] - WT_targets)**2).mean()
 
     return objective
 
 
-def train_model(params):
+def train_model(params, device):
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
     df = df[df.year > 2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
@@ -86,27 +82,25 @@ def train_model(params):
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
-
+    training_data_normalized = torch.from_numpy(training_data_normalized).to(device)
     model = LSTM(
-        input_size=4, hidden_layer_size=params['lstm_width'], fc_size=params['hidden_width'], output_size=14)
+        input_size=4, hidden_layer_size=params['lstm_width'], fc_size=params['hidden_width'], output_size=14).to(device)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params['learning_rate'])
 
     epochs = args.epochs
     train_window = params['train_window']
-
     train_seq = create_sequence(training_data_normalized, train_window)
 
     for i in range(epochs):
-        model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
-                             torch.zeros(1, 1, model.hidden_layer_size))
+        model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size).to(device),
+                             torch.zeros(1, 1, model.hidden_layer_size).to(device))
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
-            seq = torch.from_numpy(seq)
             dist = build_dist(model, seq)
 
-            targets = torch.from_numpy(targets).view(len(targets), -1).float()
+            targets=targets.view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)
             model.hidden_cell = (
                 model.hidden_cell[0].detach(), model.hidden_cell[1].detach())
@@ -121,7 +115,7 @@ def train_model(params):
 
 def objective(trial):
     params = get_params(trial)
-    model = train_model(params)
+    model = train_model(params, device=0)
     objective = score_model(model, params)
 
     return objective

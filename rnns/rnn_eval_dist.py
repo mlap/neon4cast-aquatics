@@ -16,7 +16,7 @@ parser.add_argument("--png-name", type=str,
 parser.add_argument("--model-name", type=str,
                     default="trash_model_dist_0", help="Name of model to load")
 parser.add_argument("--n-trials", type=int, default=int(25))
-parser.add_argument("--train-window", type=int, default=7)
+parser.add_argument("--train-window", type=int, default=21)
 parser.add_argument("--predict-window", type=int, default=7)
 args = parser.parse_args()
 
@@ -25,13 +25,13 @@ def main():
     scaler = MinMaxScaler(feature_range=(-1, 1))
     df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
     df = df[df.year>2019].sort_values(['year', 'month', 'day'])
-    import pdb; pdb.set_trace()
     training_data = df[["groundwaterTempMean", "uPARMean",
                         "dissolvedOxygen", "chlorophyll"]]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     _ = scaler.fit(training_data)
-    training_data = df[["groundwaterTempMean", "uPARMean",
+    training_data = df[-196:-168][["groundwaterTempMean", "uPARMean",
                         "dissolvedOxygen", "chlorophyll"]]
+    import pdb; pdb.set_trace()
     training_data_normalized = scaler.transform(training_data)
     train_window = args.train_window
 
@@ -41,9 +41,8 @@ def main():
     for i in range(1):
         test_inputs = training_data_normalized[-train_window -
                                                fut_pred:-fut_pred]
-        medians = np.array([])
-        bottom = np.array([])
-        top = np.array([])
+        means = np.array([])
+        stds = np.array([])
         model.eval()
         model.hidden_cell = (torch.zeros(1, 1, model.hidden_layer_size),
                              torch.zeros(1, 1, model.hidden_layer_size))
@@ -56,24 +55,22 @@ def main():
                     axis=0).numpy()).reshape(-1, 4)
                 #import pdb; pdb.set_trace()
                 scaled_samples = scaler.inverse_transform(samples)
-                medians = np.append(medians, np.percentile(
-                                     scaled_samples, 50, axis=0)).reshape(-1, 4)
-                bottom = np.append(bottom, np.percentile(
-                                    scaled_samples, 30, axis=0)).reshape(-1, 4)
-                top = np.append(top, np.percentile(
-                                 scaled_samples, 70, axis=0)).reshape(-1, 4)
-
+                means = np.append(means, np.mean(
+                                     scaled_samples, axis=0)).reshape(-1, 4)
+                stds = np.append(stds, np.std(
+                                    scaled_samples, axis=0)).reshape(-1, 4)
+                                    
     data_len = len(training_data_normalized)
     fig, axs = plt.subplots(2)
     axs[0].plot(np.linspace(1, data_len, data_len),
                 training_data[["dissolvedOxygen"]])
     axs[0].errorbar(np.linspace(data_len - args.predict_window, data_len, args.predict_window),
-                    medians[:, 2], [top[:, 2] - medians[:, 2], medians[:, 2] - bottom[:, 2]], capsize=5, marker="o")
+                    means[:, 2], stds[:,2], capsize=5, marker="o")
     axs[0].set_title("DO")
     axs[1].plot(np.linspace(1, data_len, data_len),
                 training_data[["groundwaterTempMean"]])
     axs[1].errorbar(np.linspace(data_len - args.predict_window, data_len, args.predict_window),
-                    medians[:, 0], [top[:, 0] - medians[:, 0], medians[:, 0] - bottom[:, 0]], capsize=5, marker="o")
+                    means[:, 0], stds[:, 0], capsize=5, marker="o")
     axs[1].set_title("Groundwater Temp")
     plt.xlabel("Day")
     plt.savefig(f"{args.png_name}.png")

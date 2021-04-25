@@ -22,7 +22,7 @@ params = {'learning_rate': 0.00001,
           'lstm_width': 512, 
           'hidden_width': 64}
 
-def main(filename_num):
+def main(filename_num, device):
     df=pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
     df = df[df.year>2019].sort_values(['year', 'month', 'day'])
     training_data = df[["groundwaterTempMean", "uPARMean",
@@ -33,20 +33,22 @@ def main(filename_num):
     
     model=LSTM(input_size=4, hidden_layer_size=params['lstm_width'],
                  fc_size=params['hidden_width'], output_size=14)
+    model = model.to(device)
+    import pdb; pdb.set_trace()
+    training_data_normalized = torch.from_numpy(training_data_normalized).to(device)
     optimizer=torch.optim.Adam(model.parameters(), lr=params['learning_rate'])
     epochs=args.epochs
 
     train_seq=create_sequence(training_data_normalized, params['train_window'])
     for i in range(epochs):
-        model.hidden_cell=(torch.zeros(1, 1, model.hidden_layer_size),
-                                     torch.zeros(1, 1, model.hidden_layer_size))
+        model.hidden_cell=(torch.zeros(1, 1, model.hidden_layer_size).to(device),
+                                     torch.zeros(1, 1, model.hidden_layer_size).to(device))
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
-            seq=torch.from_numpy(seq)
             dist=build_dist(model, seq)
 
-            targets=torch.from_numpy(targets).view(len(targets), -1).float()
+            targets=targets.view(len(targets), -1).float()
             single_loss=-dist.log_prob(targets)
             # Detaching to avoid autograd errors
             model.hidden_cell=(
@@ -67,4 +69,4 @@ if __name__ == "__main__":
     torch.cuda.set_device(0)
     print("Active Cuda Device: GPU ", torch.cuda.current_device())
     for i in range(1):
-        main(i)
+        main(i, torch.cuda.current_device())
