@@ -115,7 +115,7 @@ def train_model(params, device):
         input_size=4,
         hidden_layer_size=params["lstm_width"],
         fc_size=params["hidden_width"],
-        output_size=14,
+        output_size=8,
     ).to(device)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params["learning_rate"]
@@ -144,7 +144,7 @@ def train_model(params, device):
             single_loss.backward()
             optimizer.step()
 
-        if i % 25 == 1:
+        if i % args.epochs == 1:
             print(f"epoch: {i:3} loss: {single_loss.item():10.8f}")
 
     return model

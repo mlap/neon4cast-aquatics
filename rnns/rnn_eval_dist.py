@@ -23,6 +23,7 @@ parser.add_argument(
 parser.add_argument("--n-trials", type=int, default=int(25))
 parser.add_argument("--train-window", type=int, default=21)
 parser.add_argument("--predict-window", type=int, default=7)
+parser.add_argument("--start", type=int, default=-29)
 args = parser.parse_args()
 
 
@@ -34,22 +35,14 @@ def main():
         ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
     ]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
-    _ = scaler.fit(training_data)
-    start = -56
-    training_data = df[start : start + 28][
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    ]
-    training_data_normalized = scaler.transform(training_data)
-    train_window = args.train_window
-
-    fut_pred = args.predict_window
-    all_predictions = []
+    training_data_lstm = scaler.fit_transform(training_data)
+    train_seq = create_sequence(
+        training_data_lstm[: args.start], args.train_window
+    )
+    # Conditioning lstm cells
     model = torch.load(f"models/{args.model_name}.pkl")
     model.cpu()
     for i in range(1):
-        test_inputs = training_data_normalized[
-            -train_window - fut_pred : -fut_pred
-        ]
         means = np.array([])
         stds = np.array([])
         model.eval()
@@ -57,8 +50,24 @@ def main():
             torch.zeros(1, 1, model.hidden_layer_size),
             torch.zeros(1, 1, model.hidden_layer_size),
         )
-        for i in range(fut_pred):
-            seq = torch.FloatTensor(test_inputs[-train_window:])
+        for seq, _ in train_seq:
+            with torch.no_grad():
+                dist = build_dist(model, torch.Tensor(seq))
+
+    # Now making the predictions
+    end = args.start + args.train_window + args.predict_window
+    training_data = df[args.start : end][
+        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+    ]
+    training_data_normalized = scaler.transform(training_data)
+
+    for i in range(1):
+        test_inputs = training_data_normalized[: -args.predict_window]
+        means = np.array([])
+        stds = np.array([])
+        model.eval()
+        for i in range(args.predict_window):
+            seq = torch.FloatTensor(test_inputs[-args.train_window :])
             with torch.no_grad():
                 dist = build_dist(model, seq)
                 samples = dist.rsample((1000,))

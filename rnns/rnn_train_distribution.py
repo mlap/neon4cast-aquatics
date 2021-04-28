@@ -23,9 +23,9 @@ parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
 args = parser.parse_args()
 
 params = {
-    "learning_rate": 0.00001,
+    "learning_rate": 0.000001,
     "train_window": 21,
-    "lstm_width": 512,
+    "lstm_width": 100,
     "hidden_width": 512,
 }
 
@@ -44,7 +44,7 @@ def main(filename_num, device):
         input_size=4,
         hidden_layer_size=params["lstm_width"],
         fc_size=params["hidden_width"],
-        output_size=14,
+        output_size=8,
     )
     model = model.to(device)
     training_data_normalized = torch.from_numpy(training_data_normalized).to(
@@ -78,7 +78,7 @@ def main(filename_num, device):
             single_loss.backward()
             optimizer.step()
 
-        if i % 500 == 1:
+        if i % 100 == 1:
             print(f"epoch: {i:3} loss: {single_loss.item():10.8f}")
 
     print(f"epoch: {i:3} loss: {single_loss.item():10.10f}")
