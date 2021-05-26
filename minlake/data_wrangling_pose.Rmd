@@ -108,6 +108,6 @@ csv <- inner_join(oxy_cleaned, chla_cleaned, by=c("month", "day", "year"))
 csv <- waterT_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
 csv <- turbidity_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
 csv <- csv %>% collect()
-write.csv(waterT_cleaned, "test.csv")
+write.csv(csv, "test.csv")
 ```
 
