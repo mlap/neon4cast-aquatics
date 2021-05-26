@@ -4,9 +4,9 @@ output: html_document
 ---
 To download neonstore without getting any errors because of firewalls
 ```{r}
-devtools::install_github("richfitz/thor")
-devtools::install_github("richfitz/storr")
-devtools::install_github("cboettig/neonstore")
+#devtools::install_github("richfitz/thor")
+#devtools::install_github("richfitz/storr")
+#devtools::install_github("cboettig/neonstore")
 ```
 
 
