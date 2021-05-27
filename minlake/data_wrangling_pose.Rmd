@@ -16,6 +16,28 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(lubridate)
+
+Sys.setenv(NEONSTORE_HOME="/minio/neonstore", NEONSTORE_DB="/minio/neonstore")
+# Use a remote connection, so `dplyr` operations can be run by SQL:
+db <- neon_db(read_only = TRUE)
+waterT <- tbl(db, "TGW_30_minute-basic-DP1.20217.001")
+
+waterT_cleaned <- waterT %>%
+  select(siteID, startDateTime, groundwaterTempMean) %>%
+  filter(!(is.na(groundwaterTempMean))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
+         hour = hour(startDateTime),
+         month = month(startDateTime),
+         year = year(startDateTime),
+         day = day(startDateTime)) %>%
+  group_by(siteID, month, day, year, .groups="drop") %>% 
+  summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "POSE") %>% 
+  select(month, day, year, groundwaterTempMean)
+
+
+pose_waterT <- waterT_cleaned %>% compute()
 ```
 
 Everything is the same here but we have to tell neon to use the shared data from
