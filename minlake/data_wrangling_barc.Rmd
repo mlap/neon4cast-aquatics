@@ -1,0 +1,111 @@
+---
+title: "exploration"
+output: html_document
+---
+To download neonstore without getting any errors because of firewalls
+```{r}
+devtools::install_github("richfitz/thor")
+devtools::install_github("richfitz/storr")
+devtools::install_github("cboettig/neonstore")
+```
+
+
+```{r}
+library(neonstore)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+```
+
+Everything is the same here but we have to tell neon to use the shared data from
+minio in the first 2 lines.
+```{r}
+Sys.setenv(NEONSTORE_HOME="/minio/neonstore", NEONSTORE_DB="/minio/neonstore")
+# Use a remote connection, so `dplyr` operations can be run by SQL:
+db <- neon_db(read_only = TRUE)
+waq <- tbl(db, "waq_instantaneous-basic-DP1.20288.001")
+wind <- tbl(db, "WSDBuoy_30min-basic-DP1.20059.001")
+pressure <- tbl(db, "BP_30min-basic-DP1.20004.001")
+airT <- tbl(db, "RHbuoy_30min-basic-DP1.20046.001")
+PARsurf <- tbl(db, "PARWS_30min-basic-DP1.20042.001")
+PARbelow <- tbl(db, "uPAR_30min-basic-DP1.20261.001")
+elevSurf <- tbl(db, "EOS_30_min-basic-DP1.20016.001")
+waterT <- tbl(db, "TGW_30_minute-basic-DP1.20217.001")
+nitrate <- tbl(db, "NSW_15_minute-basic-DP1.20033.001")
+```
+
+
+Tidying up DO data, for exploration purposes I'm only going to look at the means here on but for forecasting, dealing with uncertainty will probably be the way to go. Note that the water quality data has potentially more important drivers like chlorophyll, turbidity and pH.
+```{r}
+oxy_cleaned <- waq %>%
+  select(siteID, startDateTime, dissolvedOxygen) %>%
+  filter(!(is.na(dissolvedOxygen))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
+         hour = hour(startDateTime),
+         month = month(startDateTime),
+         year = year(startDateTime),
+         day = day(startDateTime)) %>%
+  group_by(siteID, month, day, year) %>% 
+  summarize(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "BARC") %>% 
+  select(month, day, year, dissolvedOxygen) 
+```
+
+Chlorophyll A concentration
+```{r}
+chla_cleaned <- waq %>%
+  select(siteID, startDateTime, chlorophyll) %>%
+  filter(!(is.na(chlorophyll))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
+         hour = hour(startDateTime),
+         month = month(startDateTime),
+         year = year(startDateTime),
+         day = day(startDateTime)) %>%
+  group_by(siteID, month, day, year, .groups="drop") %>% 
+  summarize(chlorophyll = mean(chlorophyll, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "BARC") %>% 
+  select(month, day, year, chlorophyll) 
+```
+
+```{r}
+waterT_cleaned <- waterT %>%
+  select(siteID, startDateTime, groundwaterTempMean) %>%
+  filter(!(is.na(groundwaterTempMean))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
+         hour = hour(startDateTime),
+         month = month(startDateTime),
+         year = year(startDateTime),
+         day = day(startDateTime)) %>%
+  group_by(siteID, month, day, year, .groups="drop") %>% 
+  summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "BARC") %>% 
+  select(month, day, year, groundwaterTempMean)
+```
+
+```{r}
+PARbelow_cleaned <- PARbelow %>% 
+  select(siteID, startDateTime, uPARMean) %>%
+  filter(!(is.na(uPARMean))) %>% 
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
+         hour = hour(startDateTime),
+         month = month(startDateTime),
+         year = year(startDateTime),
+         day = day(startDateTime)) %>%
+  group_by(siteID, month, day, year, .groups="drop") %>% 
+  summarize(uPARMean = mean(uPARMean, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "BARC") %>% 
+  select(month, day, year, uPARMean) 
+```
+
+
+```{r}
+csv <- inner_join(oxy_cleaned, chla_cleaned, by=c("month", "day", "year"))
+csv <- waterT_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
+csv <- PARbelow_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
+write.csv(csv, "BARC_data.csv")
+```

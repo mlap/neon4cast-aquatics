@@ -4,9 +4,9 @@ output: html_document
 ---
 To download neonstore without getting any errors because of firewalls
 ```{r}
-devtools::install_github("richfitz/thor")
-devtools::install_github("richfitz/storr")
-devtools::install_github("cboettig/neonstore")
+#devtools::install_github("richfitz/thor")
+#devtools::install_github("richfitz/storr")
+#devtools::install_github("cboettig/neonstore")
 ```
 
 
@@ -49,7 +49,7 @@ oxy_cleaned <- waq %>%
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year) %>% 
   summarize(dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE), .groups="drop") %>% 
-  filter(siteID == "BARC") %>% 
+  filter(siteID == "POSE") %>% 
   select(month, day, year, dissolvedOxygen) 
 ```
 
@@ -66,7 +66,7 @@ chla_cleaned <- waq %>%
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
   summarize(chlorophyll = mean(chlorophyll, na.rm = TRUE), .groups="drop") %>% 
-  filter(siteID == "BARC") %>% 
+  filter(siteID == "POSE") %>% 
   select(month, day, year, chlorophyll) 
 ```
 
@@ -80,16 +80,17 @@ waterT_cleaned <- waterT %>%
          month = month(startDateTime),
          year = year(startDateTime),
          day = day(startDateTime)) %>%
-  group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
-  filter(siteID == "BARC") %>% 
-  select(month, day, year, groundwaterTempMean) 
+  group_by(siteID, month, day, year) %>% 
+  filter(siteID == "POSE") %>% 
+  collect() %>% 
+  summarise(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
+  select(month, day, year, groundwaterTempMean)
 ```
 
 ```{r}
-PARbelow_cleaned <- PARbelow %>% 
-  select(siteID, startDateTime, uPARMean) %>%
-  filter(!(is.na(uPARMean))) %>% 
+turbidity_cleaned <- waq %>%
+  select(siteID, startDateTime, turbidity) %>%
+  filter(!(is.na(turbidity))) %>% 
   mutate(startDateTime = as_datetime(startDateTime)) %>%
   mutate(date = as_date(startDateTime),
          hour = hour(startDateTime),
@@ -97,18 +98,20 @@ PARbelow_cleaned <- PARbelow %>%
          year = year(startDateTime),
          day = day(startDateTime)) %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
-  summarize(uPARMean = mean(uPARMean, na.rm = TRUE), .groups="drop") %>% 
-  filter(siteID == "BARC") %>% 
-  select(month, day, year, uPARMean) 
+  summarize(turbidity = mean(turbidity, na.rm = TRUE), .groups="drop") %>% 
+  filter(siteID == "POSE") %>% 
+  select(month, day, year, turbidity) 
 ```
 
+
 ```{r}
+oxy_cleaned <- oxy_cleaned %>% collect()
+chla_cleaned <- chla_cleaned %>%  collect()
+turbidity_cleaned <-  turbidity_cleaned %>% collect()
 csv <- inner_join(oxy_cleaned, chla_cleaned, by=c("month", "day", "year"))
 csv <- waterT_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
-csv <- PARbelow_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
-write.csv(csv, "minlake_test.csv")
+csv <- turbidity_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
+csv <- csv %>% collect()
+write.csv(csv, "minlake_test_POSE.csv")
 ```
 
-```{r}
-oxy_cleaned %>% filter(month==1, year == 2021) %>% head() %>% ggplot()
-```
