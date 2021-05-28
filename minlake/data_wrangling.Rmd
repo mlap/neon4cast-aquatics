@@ -83,7 +83,7 @@ waterT_cleaned <- waterT %>%
   group_by(siteID, month, day, year, .groups="drop") %>% 
   summarize(groundwaterTempMean = mean(groundwaterTempMean, na.rm = TRUE), .groups="drop") %>% 
   filter(siteID == "BARC") %>% 
-  select(month, day, year, groundwaterTempMean) 
+  select(month, day, year, groundwaterTempMean)
 ```
 
 ```{r}
@@ -102,13 +102,10 @@ PARbelow_cleaned <- PARbelow %>%
   select(month, day, year, uPARMean) 
 ```
 
+
 ```{r}
 csv <- inner_join(oxy_cleaned, chla_cleaned, by=c("month", "day", "year"))
 csv <- waterT_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
 csv <- PARbelow_cleaned %>% inner_join(csv, by=c("month", "day", "year"))
-write.csv(csv, "minlake_test.csv")
-```
-
-```{r}
-oxy_cleaned %>% filter(month==1, year == 2021) %>% head() %>% ggplot()
+write.csv(csv, "BARC_data.csv")
 ```
