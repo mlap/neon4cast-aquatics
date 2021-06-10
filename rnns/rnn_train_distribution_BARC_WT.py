@@ -19,7 +19,7 @@ parser.add_argument(
     default="trash_model_dist",
     help="Name to save model",
 )
-parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
+parser.add_argument("--epochs", type=int, default=2, help="Number of Epochs")
 args = parser.parse_args()
 
 params = {
@@ -31,26 +31,26 @@ params = {
 
 
 def main(filename_num, device):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = pd.read_csv("BARC_waterT_data.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])
     df.set_index('date', inplace=True)
-    idx = pd.date_range(start = '2017-10-20', end = '2021-04-30' )
+    idx = pd.date_range(start = '2017-08-27', end = '2021-04-30' )
     df = df.reindex(idx, fill_value=np.NaN)
     df = df.interpolate(method ='linear', limit_direction ='forward')
     training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean"]
     ]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
 
     model = LSTM(
-        input_size=4,
+        input_size=1,
         hidden_layer_size=params["lstm_width"],
         fc_size=params["hidden_width"],
-        output_size=8,
+        output_size=2,
     )
     model = model.to(device)
     training_data_normalized = torch.from_numpy(training_data_normalized).to(
@@ -72,7 +72,7 @@ def main(filename_num, device):
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
-            dist = build_dist(model, seq)
+            dist = build_dist_WT(model, seq)
 
             targets = targets.view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)

@@ -17,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model_dist_0",
+    default="64_lstm_64_hidden_BARC_WT_0",
     help="Name of model to load",
 )
 parser.add_argument("--n-trials", type=int, default=int(25))
@@ -29,16 +29,16 @@ args = parser.parse_args()
 
 def main():
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = pd.read_csv("BARC_waterT_data.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])
     df.set_index('date', inplace=True)
-    idx = pd.date_range(start = '2017-10-20', end = '2021-04-30' )
+    idx = pd.date_range(start = '2017-08-27', end = '2021-04-30' )
     df = df.reindex(idx, fill_value=np.NaN)
     df = df.interpolate(method ='linear', limit_direction ='forward')
     training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean",]
     ]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     training_data_lstm = scaler.fit_transform(training_data)
@@ -58,12 +58,12 @@ def main():
         )
         for seq, _ in train_seq:
             with torch.no_grad():
-                dist = build_dist(model, torch.Tensor(seq))
+                dist = build_dist_WT(model, torch.Tensor(seq))
     
     # Now making the predictions
     end = args.start + args.train_window + args.predict_window
     training_data = df[args.start : end][
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean"]
     ]
     training_data_normalized = scaler.transform(training_data)
 
@@ -75,40 +75,26 @@ def main():
         for i in range(args.predict_window):
             seq = torch.FloatTensor(test_inputs[-args.train_window :])
             with torch.no_grad():
-                dist = build_dist(model, seq)
+                dist = build_dist_WT(model, seq)
                 samples = dist.rsample((1000,))
                 test_inputs = np.append(
                     test_inputs, samples.mean(axis=0).numpy()
-                ).reshape(-1, 4)
+                ).reshape(-1, 1)
                 # import pdb; pdb.set_trace()
                 scaled_samples = scaler.inverse_transform(samples)
                 means = np.append(
                     means, np.mean(scaled_samples, axis=0)
-                ).reshape(-1, 4)
+                ).reshape(-1, 1)
                 stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
-                    -1, 4
+                    -1, 1
                 )
 
     data_len = len(training_data_normalized)
-    fig, axs = plt.subplots(2)
-    axs[0].plot(
-        np.linspace(1, data_len, data_len), training_data[["dissolvedOxygen"]]
-    )
-    axs[0].errorbar(
-        np.linspace(
-            data_len - args.predict_window, data_len, args.predict_window
-        ),
-        means[:, 2],
-        stds[:, 2],
-        capsize=5,
-        marker="o",
-    )
-    axs[0].set_title("DO")
-    axs[1].plot(
+    plt.plot(
         np.linspace(1, data_len, data_len),
         training_data[["groundwaterTempMean"]],
     )
-    axs[1].errorbar(
+    plt.errorbar(
         np.linspace(
             data_len - args.predict_window, data_len, args.predict_window
         ),
@@ -117,7 +103,7 @@ def main():
         capsize=5,
         marker="o",
     )
-    axs[1].set_title("Groundwater Temp")
+    plt.suptitle("Groundwater Temp")
     plt.xlabel("Day")
     plt.savefig(f"{args.png_name}.png")
 

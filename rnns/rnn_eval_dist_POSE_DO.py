@@ -17,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model_dist_0",
+    default="trash_model_dist_POSE_0",
     help="Name of model to load",
 )
 parser.add_argument("--n-trials", type=int, default=int(25))
@@ -29,16 +29,16 @@ args = parser.parse_args()
 
 def main():
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = pd.read_csv("POSE_data.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])
     df.set_index('date', inplace=True)
-    idx = pd.date_range(start = '2017-10-20', end = '2021-04-30' )
+    idx = pd.date_range(start = '2016-10-11', end = '2021-04-30' )
     df = df.reindex(idx, fill_value=np.NaN)
     df = df.interpolate(method ='linear', limit_direction ='forward')
     training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
     ]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     training_data_lstm = scaler.fit_transform(training_data)
@@ -63,7 +63,7 @@ def main():
     # Now making the predictions
     end = args.start + args.train_window + args.predict_window
     training_data = df[args.start : end][
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
     ]
     training_data_normalized = scaler.transform(training_data)
 
@@ -80,7 +80,6 @@ def main():
                 test_inputs = np.append(
                     test_inputs, samples.mean(axis=0).numpy()
                 ).reshape(-1, 4)
-                # import pdb; pdb.set_trace()
                 scaled_samples = scaler.inverse_transform(samples)
                 means = np.append(
                     means, np.mean(scaled_samples, axis=0)

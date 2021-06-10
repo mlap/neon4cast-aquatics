@@ -26,14 +26,21 @@ def build_cov_matrix(var):
     """
     This function builds a covariance matrix from variates and covariates
     """
-    cov_mat = torch.diag(var)
+    cov_mat = torch.diag(torch.abs(var) + 1e-10)
     return cov_mat
 
 
 def build_dist(model, seq):
     y_pred = model(seq).view(-1)
     mu = y_pred[:4]
-    var = torch.abs(y_pred[4:8])
+    var = y_pred[4:8]
+    cov_matrix = build_cov_matrix(var)
+    return MultivariateNormal(mu, cov_matrix)
+    
+def build_dist_WT(model, seq):
+    y_pred = model(seq).view(-1)
+    mu = y_pred[0].view(1)
+    var = y_pred[1].view(1)
     cov_matrix = build_cov_matrix(var)
     return MultivariateNormal(mu, cov_matrix)
 
@@ -65,10 +72,7 @@ class LSTM(nn.Module):
         out = self.relu(lstm_out)
         out = self.fc_0(out)
         out = self.relu(out)
-        # out = self.dropout(out)
         out = self.fc_1(out)
         out = self.relu(out)
-        # out = self.dropout(out)
         out = self.fc_2(out.view(len(input_seq), -1))
-        # out = self.dropout(out)
         return out[-1]

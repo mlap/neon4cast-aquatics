@@ -12,18 +12,17 @@ import argparse
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--png-name", type=str, default="trash", help="Name to save png"
+    "--png-name", type=str, default="trash_forecast", help="Name to save png"
 )
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model_dist_0",
+    default="64_lstm_64_hidden_BARC_final_DO",
     help="Name of model to load",
 )
-parser.add_argument("--n-trials", type=int, default=int(25))
 parser.add_argument("--train-window", type=int, default=21)
 parser.add_argument("--predict-window", type=int, default=7)
-parser.add_argument("--start", type=int, default=-29)
+parser.add_argument("--start", type=int, default=-21)
 args = parser.parse_args()
 
 
@@ -45,6 +44,7 @@ def main():
     train_seq = create_sequence(
         training_data_lstm[: args.start], args.train_window
     )
+    
     # Conditioning lstm cells
     model = torch.load(f"models/{args.model_name}.pkl")
     model.cpu()
@@ -61,14 +61,13 @@ def main():
                 dist = build_dist(model, torch.Tensor(seq))
     
     # Now making the predictions
-    end = args.start + args.train_window + args.predict_window
-    training_data = df[args.start : end][
+    training_data = df[args.start :][
         ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
     ]
     training_data_normalized = scaler.transform(training_data)
 
     for i in range(1):
-        test_inputs = training_data_normalized[: -args.predict_window]
+        test_inputs = training_data_normalized
         means = np.array([])
         stds = np.array([])
         model.eval()
@@ -76,7 +75,7 @@ def main():
             seq = torch.FloatTensor(test_inputs[-args.train_window :])
             with torch.no_grad():
                 dist = build_dist(model, seq)
-                samples = dist.rsample((1000,))
+                samples = dist.rsample((10000,))
                 test_inputs = np.append(
                     test_inputs, samples.mean(axis=0).numpy()
                 ).reshape(-1, 4)
@@ -88,15 +87,34 @@ def main():
                 stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
                     -1, 4
                 )
-
+    
+    dates = pd.date_range(start = '2021-05-01', end = '2021-05-07' )
+    df_means = pd.DataFrame(columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen', 'temp'])
+    df_means['time'] = dates
+    df_means['siteID'] = 'BARC'
+    df_means['statistic'] = 'mean'
+    df_means['forecast'] = 1
+    df_means['data_assimilation'] = 0
+    df_means['oxygen'] = means[:, 2]
+    df_means['temp'] = means[:, 0]
+    
+    df_stds = deepcopy(df_means)
+    df_stds['statistic'] = 'sd'
+    df_stds['oxygen'] = stds[:, 2]
+    df_stds['temp'] = stds[:, 0]
+    
+    df = df_means.append(df_stds)
+    df.to_csv('forecastBARC.csv', index=False)
+    
     data_len = len(training_data_normalized)
+    #Uncomment the following to plot
     fig, axs = plt.subplots(2)
     axs[0].plot(
         np.linspace(1, data_len, data_len), training_data[["dissolvedOxygen"]]
     )
     axs[0].errorbar(
         np.linspace(
-            data_len - args.predict_window, data_len, args.predict_window
+            data_len + 1, data_len + 1 + args.predict_window, args.predict_window
         ),
         means[:, 2],
         stds[:, 2],
@@ -110,7 +128,7 @@ def main():
     )
     axs[1].errorbar(
         np.linspace(
-            data_len - args.predict_window, data_len, args.predict_window
+            data_len + 1 , data_len + 1 + args.predict_window, args.predict_window
         ),
         means[:, 0],
         stds[:, 0],

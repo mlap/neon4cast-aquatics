@@ -17,7 +17,7 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model_dist_0",
+    default="64_lstm_64_hidden_BARC_final_DO",
     help="Name of model to load",
 )
 parser.add_argument("--n-trials", type=int, default=int(25))

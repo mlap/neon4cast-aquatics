@@ -31,7 +31,7 @@ params = {
 
 
 def main(filename_num, device):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = pd.read_csv("BARC_data.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])

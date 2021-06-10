@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--file-name",
     type=str,
-    default="trash_model_dist",
+    default="trash_model_dist_POSE",
     help="Name to save model",
 )
 parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
@@ -31,16 +31,16 @@ params = {
 
 
 def main(filename_num, device):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+    df = pd.read_csv("POSE_data.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])
     df.set_index('date', inplace=True)
-    idx = pd.date_range(start = '2017-10-20', end = '2021-04-30' )
+    idx = pd.date_range(start = '2016-10-11', end = '2021-04-30' )
     df = df.reindex(idx, fill_value=np.NaN)
     df = df.interpolate(method ='linear', limit_direction ='forward')
     training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+        ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
     ]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
