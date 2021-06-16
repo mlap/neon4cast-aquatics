@@ -1,3 +1,5 @@
+# This needs to be reworked
+
 import torch
 import torch.nn as nn
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -8,7 +10,7 @@ import numpy as np
 from random import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from copy import deepcopy
-from rnn_utils import *
+from utils import *
 import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
