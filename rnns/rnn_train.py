@@ -1,56 +1,50 @@
 import torch
 import torch.nn as nn
+from torch.distributions.multivariate_normal import MultivariateNormal
 import matplotlib.pyplot as plt
+import optuna
 import pandas as pd
 import numpy as np
+from random import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from copy import deepcopy
-from rnn_utils import *
+from utils import *
+import argparse
 
+# Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
+parser = argparse.ArgumentParser()
+parser.add_argument("--csv-name", type=str, default="POSE_data.csv", help="Name of CSV to use")
+parser.add_argument(
+    "--file-name",
+    type=str,
+    default="trash_model_dist",
+    help="Name to save model",
+)
+parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
+parser.add_argument("--variable", type=str, default="do", help="Name of variable being predicted (wt/do)")
+args = parser.parse_args()
 
-def main(filename_num):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
+# Edit hyperparameters here
+params = {
+    "learning_rate": 0.000001,
+    "train_window": 21,
+    "hidden_dim": 64,
+    "n_layers": 2,
+}
 
-    training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    ].loc[:28]
+def main(device):
+    df = get_data(args.csv_name)
+    params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
+    variables = get_variables(params_etcs)
+    training_data = df[variables]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
-
-    model = LSTM(input_size=4, output_size=4)
-    loss_function = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    epochs = 300
-    train_window = 7
-    train_seq = create_sequence(training_data_normalized, train_window)
-
-    for i in range(epochs):
-        for seq, labels in train_seq:
-            optimizer.zero_grad()
-            model.hidden_cell = (
-                torch.zeros(1, 1, model.hidden_layer_size),
-                torch.zeros(1, 1, model.hidden_layer_size),
-            )
-            model.float()
-            seq = torch.from_numpy(seq)
-            y_pred = model(seq).view(1, -1)
-            labels = torch.from_numpy(labels).view(len(labels), -1).float()
-            single_loss = loss_function(y_pred, labels)
-            single_loss.backward()
-            optimizer.step()
-
-        if i % 25 == 1:
-            print(f"epoch: {i:3} loss: {single_loss.item():10.8f}")
-
-    print(f"epoch: {i:3} loss: {single_loss.item():10.10f}")
-
-    torch.save(model, f"models/trash_model{filename_num}.pkl")
+    # Training the model
+    train(training_data_normalized, params, args, device)
 
 
 if __name__ == "__main__":
     torch.cuda.set_device(0)
     print("Active Cuda Device: GPU ", torch.cuda.current_device())
-    for i in range(10):
-        main(i)
+    main(torch.cuda.current_device())

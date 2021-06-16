@@ -1,3 +1,5 @@
+# This needs to be reworked
+
 import torch
 import torch.nn as nn
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -8,7 +10,7 @@ import numpy as np
 from random import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from copy import deepcopy
-from rnn_utils import *
+from utils import *
 import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
@@ -32,9 +34,9 @@ args = parser.parse_args()
 def get_params(trial):
     params = {
         "learning_rate": trial.suggest_loguniform("learning_rate", 1e-5, 1),
-        "train_window": trial.suggest_categorical("train_window", [7, 14, 21]),
+        "train_window": trial.suggest_categorical("train_window", [21, 28, 35, 42, 49]),
         "lstm_width": trial.suggest_categorical(
-            "lstm_width", [64, 128, 256, 512]
+            "lstm_width", [512, 768, 1024, 1280]
         ),
         "hidden_width": trial.suggest_categorical(
             "hidden_width", [64, 128, 256, 512]
@@ -56,10 +58,15 @@ def score_model(model, params):
     training_data_normalized = scaler.fit_transform(training_data)
     fut_pred = args.prediction_window
     train_window = params["train_window"]
-    all_predictions = []
-    test_inputs = training_data_normalized[
-        -train_window - fut_pred : -fut_pred
-    ]
+    
+    # Conditioning lstm cells
+    train_seq = create_sequence(
+        training_data_normalized[: -train_window - fut_pred], train_window
+    )
+    model.hidden_cell = (
+            torch.zeros(1, 1, model.hidden_layer_size),
+            torch.zeros(1, 1, model.hidden_layer_size),
+        )
     for i in range(1):
         means = np.array([])
         stds = np.array([])
@@ -68,6 +75,17 @@ def score_model(model, params):
             torch.zeros(1, 1, model.hidden_layer_size),
             torch.zeros(1, 1, model.hidden_layer_size),
         )
+        for seq, _ in train_seq:
+            with torch.no_grad():
+                dist = build_dist(model, torch.Tensor(seq))
+    
+    test_inputs = training_data_normalized[
+        -train_window - fut_pred : -fut_pred
+    ]
+    for i in range(1):
+        means = np.array([])
+        stds = np.array([])
+        model.eval()
         for i in range(fut_pred):
             seq = torch.FloatTensor(test_inputs[-train_window:])
             with torch.no_grad():
