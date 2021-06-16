@@ -34,7 +34,8 @@ params = {
 
 def main(device):
     df = get_data(args.csv_name)
-    variables = get_variables(args)
+    params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
+    variables = get_variables(params_etcs)
     training_data = df[variables]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))

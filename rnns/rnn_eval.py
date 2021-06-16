@@ -17,10 +17,11 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="64_lstm_64_hidden_BARC_final_DO",
+    default="trash_model_dist",
     help="Name of model to load",
 )
 parser.add_argument("--start", type=int, default=-29, help="Where to start the forecast, (-(how many places from the end))")
+parser.add_argument("--predict-window", type=int, default=7, help="How long of a forecast to make")
 args = parser.parse_args()
 
 def main():
@@ -33,18 +34,18 @@ def main():
     data_scaled = scaler.fit_transform(data)
     # Creating a sequence to condition the LSTM cells
     condition_seq = create_sequence(
-        data_scaled[: args.start], params_etc["train_window"]
+        data_scaled[: args.start], params_etcs["train_window"]
     )
     # Indexing the appropriate data
-    end = args.start + params_etc["train_window"] + params_etc["predict_window"]
+    end = args.start + params_etcs["train_window"] + args.predict_window
     evaluation_data = data[args.start : end]
     # Evaluating the data
-    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etc)
+    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etcs)
     # Plotting the data
     data_len = len(evaluation_data)
-    start_idx = data_len - params_etc["predict_window"]
+    start_idx = data_len - args.predict_window
     end_idx = data_len
-    plot(evaluation_data, means, stds, args, params_etc, start_idx, end_idx)
+    plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx)
 
 
 if __name__ == "__main__":
