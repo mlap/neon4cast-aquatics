@@ -21,7 +21,7 @@ parser.add_argument(
     help="Name to save model",
 )
 parser.add_argument("--epochs", type=int, default=25, help="Number of Epochs")
-parser.add_argument("--variable", type=str, default="wt", help="Name of variable being predicted (wt/do)")
+parser.add_argument("--variable", type=str, default="do", help="Name of variable being predicted (wt/do)")
 args = parser.parse_args()
 
 # Edit hyperparameters here

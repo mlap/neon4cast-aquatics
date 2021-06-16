@@ -6,44 +6,45 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from copy import deepcopy
+import yaml
 
-def make_forecast(args, means, stds):
+def make_forecast(args, params_etc, means, stds):
     """
     Saves a forecast csv to forecastSITE.csv
     """
     dates = pd.date_range(start = args.start_date, end = args.end_date )
     columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen']
-    if args.variable == "do":
+    if params_etc["variable"] == "do":
       columns.append("temp")
     df_means = pd.DataFrame(columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen', 'temp'])
     df_means['time'] = dates
-    df_means['siteID'] = args.csv_name[:4]
+    df_means['siteID'] = params_etc["csv_name"][:4]
     df_means['statistic'] = 'mean'
     df_means['forecast'] = 1
     df_means['data_assimilation'] = 0
-    if args.variable == "do":
+    if params_etc["variable"] == "do":
       df_means['oxygen'] = means[:, 2]
     df_means['temp'] = means[:, 0]
     
     df_stds = deepcopy(df_means)
     df_stds['statistic'] = 'sd'
-    if args.variable == "do":
+    if params_etc["variable"] == "do":
       df_stds['oxygen'] = stds[:, 2]
     df_stds['temp'] = stds[:, 0]
     
     df = df_means.append(df_stds)
-    df.to_csv(f'forecast{args.csv_name[:4]}.csv', index=False)
+    df.to_csv(f'forecast{params_etc["csv_name"][:4]}.csv', index=False)
 
-def plot(evaluation_data, means, stds, args, start_idx, end_idx):
+def plot(evaluation_data, means, stds, args, params_etc, start_idx, end_idx):
     data_len = len(evaluation_data)
-    if args.variable == "do":
+    if params_etc["variable"] == "do":
         fig, axs = plt.subplots(2)
         axs[0].plot(
             np.linspace(1, data_len, data_len), evaluation_data[["dissolvedOxygen"]]
         )
         axs[0].errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["predict_window"]
             ),
             means[:, 2],
             stds[:, 2],
@@ -57,7 +58,7 @@ def plot(evaluation_data, means, stds, args, start_idx, end_idx):
         )
         axs[1].errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["predict_window"]
             ),
             means[:, 0],
             stds[:, 0],
@@ -67,14 +68,14 @@ def plot(evaluation_data, means, stds, args, start_idx, end_idx):
         axs[1].set_title("Groundwater Temp")
         plt.xlabel("Day")
         plt.savefig(f"{args.png_name}.png")
-    elif args.variable == "wt":
+    elif params_etc["variable"] == "wt":
         plt.plot(
             np.linspace(1, data_len, data_len),
             evaluation_data[["groundwaterTempMean"]],
         )
         plt.errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["predict_window"]
             ),
             means[:, 0],
             stds[:, 0],
@@ -86,7 +87,7 @@ def plot(evaluation_data, means, stds, args, start_idx, end_idx):
         plt.savefig(f"{args.png_name}.png")
 
 
-def evaluate(evaluation_data, condition_seq, args, scaler):
+def evaluate(evaluation_data, condition_seq, args, scaler, params_etc):
     # Conditioning lstm cells
     model = torch.load(f"models/{args.model_name}.pkl")
     model.cpu()
@@ -95,8 +96,8 @@ def evaluate(evaluation_data, condition_seq, args, scaler):
         stds = np.array([])
         model.eval()
         model.hidden_cell = (
-            torch.zeros(args.n_layers, 1, model.hidden_dim),
-            torch.zeros(args.n_layers, 1, model.hidden_dim),
+            torch.zeros(params_etc["n_layers"], 1, model.hidden_dim),
+            torch.zeros(params_etc["n_layers"], 1, model.hidden_dim),
         )
         for seq, _ in condition_seq:
             with torch.no_grad():
@@ -107,12 +108,12 @@ def evaluate(evaluation_data, condition_seq, args, scaler):
     evaluation_data_normalized = scaler.transform(evaluation_data)
 
     for i in range(1):
-        test_inputs = evaluation_data_normalized[: -args.predict_window]
+        test_inputs = evaluation_data_normalized[: -params_etc["predict_window"]]
         means = np.array([])
         stds = np.array([])
         model.eval()
         for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-args.train_window :])
+            seq = torch.FloatTensor(test_inputs[-params_etc["train_window"] :])
             with torch.no_grad():
                 dist = build_dist(model, seq)
                 samples = dist.rsample((1000,))
@@ -130,16 +131,29 @@ def evaluate(evaluation_data, condition_seq, args, scaler):
     return means, stds
 
 
-def get_variables(args):
+def get_variables(params_etcs):
     # Selecting the right variables 
-    if args.variable == "wt":
+    if params_etcs["variable"] == "wt":
         vars = ["groundwaterTempMean"]
-    elif args.variable == "do" and args.csv_name == "BARC_data.csv":
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "BARC_data.csv":
         vars = ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    elif args.variable == "do" and args.csv_name == "POSE_data.csv":
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "POSE_data.csv":
         vars = ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
     
     return vars
+
+def save_etcs(args, params):
+    with open(f"models/{args.file_name}.yaml", 'w') as file:
+      params["variable"] = args.variable
+      params["epochs"] = args.epochs
+      params["csv"] = args.csv_name
+      documents = yaml.dump(params, file)
+      
+def load_etcs(model_name):
+    with open(f"models/{model_name}.yaml") as file:
+        etcs = yaml.load(file, Loader=yaml.FullLoader)
+    return etcs
+    
 
 def train(training_data_normalized, params, args, device):
     # Accounting for the number of drivers used for water temp vs DO
@@ -193,6 +207,8 @@ def train(training_data_normalized, params, args, device):
     print(f"epoch: {i:3} loss: {single_loss.item():10.10f}")
 
     torch.save(model, f"models/{args.file_name}.pkl")
+    save_etcs(args, params)
+    
 
 def get_data(csv_name):
     """
