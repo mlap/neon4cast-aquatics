@@ -3,3 +3,7 @@ clean:
 
 test:
 	./tests/libs/bats/bin/bats tests/test.bats
+
+install-test-reqs:
+	mkdir -p tests/libs
+	git submodule add https://github.com/sstephenson/bats tests/libs/bats
