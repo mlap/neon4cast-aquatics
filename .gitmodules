@@ -1,3 +1,9 @@
 [submodule "test/libs/bats"]
 	path = test/libs/bats
 	url = https://github.com/sstephenson/bats
+[submodule "rnns/test/test_helper/bats-support"]
+	path = rnns/test/test_helper/bats-support
+	url = https://github.com/bats-core/bats-support.git
+[submodule "rnns/test/test_helper/bats-assert"]
+	path = rnns/test/test_helper/bats-assert
+	url = https://github.com/bats-core/bats-assert.git
