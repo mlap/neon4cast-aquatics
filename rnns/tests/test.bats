@@ -3,3 +3,7 @@
 @test "Testing DO" {
   bash tests/test-do.sh
 }
+
+@test "Testing WT" {
+  bash tests/test-wt.sh
+}
