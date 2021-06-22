@@ -2,6 +2,7 @@ import torch
 from sklearn.preprocessing import MinMaxScaler
 from utils import *
 import argparse
+import os
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
@@ -47,6 +48,8 @@ def main(device):
 
 
 if __name__ == "__main__":
+    if not os.path.exists('models'):
+        os.makedirs('models')
     torch.cuda.set_device(0)
     print("Active Cuda Device: GPU ", torch.cuda.current_device())
     main(torch.cuda.current_device())

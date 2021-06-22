@@ -3,6 +3,7 @@ import optuna
 from sklearn.preprocessing import MinMaxScaler
 from utils import *
 import argparse
+import os
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
@@ -122,6 +123,8 @@ def objective(trial):
 
 
 if __name__ == "__main__":
+    if not os.path.exists('studies'):
+        os.makedirs('studies')
     torch.cuda.set_device(0)
     print("GPU Device: ", torch.cuda.current_device())
     storage_name = f"sqlite:///studies/{args.study_name}.db"

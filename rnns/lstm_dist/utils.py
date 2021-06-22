@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.distributions.multivariate_normal import MultivariateNormal
+import matplotlib
+matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
