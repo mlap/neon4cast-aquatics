@@ -13,7 +13,7 @@ import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
-parser.add_argument("--csv-name", type=str, default="POSE_data.csv", help="Name of CSV to use")
+parser.add_argument("--csv-name", type=str, default="POSE_data", help="Name of CSV to use")
 parser.add_argument(
     "--file-name",
     type=str,
@@ -41,7 +41,7 @@ def main(device):
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
     # Training the model
-    train(training_data_normalized, params, args, device)
+    train(training_data_normalized, params, args, device, save_flag=True)
 
 
 if __name__ == "__main__":

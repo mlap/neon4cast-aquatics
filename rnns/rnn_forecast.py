@@ -38,9 +38,10 @@ def main():
         data_scaled[: -params_etcs["train_window"]], params_etcs["train_window"]
     )
     # Indexing the appropriate data
-    evaluation_data = data[-params_etcs["train_window"]:]
+    evaluation_data = data_scaled[-params_etcs["train_window"]:]
     # Evaluating the data
-    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etcs)
+    model = torch.load(f"models/{args.model_name}.pkl")
+    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etcs, model)
     
     make_forecast(args, params_etcs, means, stds)
     

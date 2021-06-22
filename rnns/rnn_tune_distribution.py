@@ -1,5 +1,4 @@
 # This needs to be reworked
-
 import torch
 import torch.nn as nn
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -15,6 +14,8 @@ import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
+parser.add_argument("--variable", type=str, default="do", help="Name of variable being predicted (wt/do)")
+parser.add_argument("--csv-name", type=str, default="POSE_data", help="Name of CSV to use")
 parser.add_argument(
     "--study-name", type=str, default="trash", help="Study name"
 )
@@ -23,7 +24,7 @@ parser.add_argument(
 )
 parser.add_argument("--epochs", type=int, default=1, help="Number of Epochs")
 parser.add_argument(
-    "--prediction-window",
+    "--predict-window",
     type=int,
     default=7,
     help="How many days in advance to predict",
@@ -35,75 +36,42 @@ def get_params(trial):
     params = {
         "learning_rate": trial.suggest_loguniform("learning_rate", 1e-5, 1),
         "train_window": trial.suggest_categorical("train_window", [21, 28, 35, 42, 49]),
-        "lstm_width": trial.suggest_categorical(
-            "lstm_width", [512, 768, 1024, 1280]
+        "n_layers": trial.suggest_categorical(
+            "n_layers", [2, 3, 4]
         ),
-        "hidden_width": trial.suggest_categorical(
-            "hidden_width", [64, 128, 256, 512]
+        "hidden_dim": trial.suggest_categorical(
+            "hidden_dim", [8, 16, 32]
         ),
     }
-
     return params
 
 
 def score_model(model, params):
-    model.cpu()
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-    df = df[df.year > 2019].sort_values(["year", "month", "day"])
-    training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    ]
+    #model.cpu()
+    df = get_data(args.csv_name)
+    params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
+    #params.update(params_etcs)
+    variables = get_variables(params)
+    data = df[variables]
+    
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    training_data_normalized = scaler.fit_transform(training_data)
-    fut_pred = args.prediction_window
-    train_window = params["train_window"]
+    data_normalized = scaler.fit_transform(data)
     
     # Conditioning lstm cells
-    train_seq = create_sequence(
-        training_data_normalized[: -train_window - fut_pred], train_window
+    condition_seq = create_sequence(
+        data_normalized[: -params["train_window"] - args.predict_window], params["train_window"]
     )
-    model.hidden_cell = (
-            torch.zeros(1, 1, model.hidden_layer_size),
-            torch.zeros(1, 1, model.hidden_layer_size),
-        )
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.eval()
-        model.hidden_cell = (
-            torch.zeros(1, 1, model.hidden_layer_size),
-            torch.zeros(1, 1, model.hidden_layer_size),
-        )
-        for seq, _ in train_seq:
-            with torch.no_grad():
-                dist = build_dist(model, torch.Tensor(seq))
-    
-    test_inputs = training_data_normalized[
-        -train_window - fut_pred : -fut_pred
+    evaluation_data = data_normalized[
+        -params["train_window"] - args.predict_window : -args.predict_window
     ]
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.eval()
-        for i in range(fut_pred):
-            seq = torch.FloatTensor(test_inputs[-train_window:])
-            with torch.no_grad():
-                dist = build_dist(model, seq)
-                samples = dist.rsample((1000,))
-                scaled_samples = scaler.inverse_transform(samples)
-                means = np.append(
-                    means, np.mean(scaled_samples, axis=0)
-                ).reshape(-1, 4)
-                stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
-                    -1, 4
-                )
+    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params, model)
 
     DO_targets = (
-        training_data[["dissolvedOxygen"]][-fut_pred:].to_numpy().reshape(-1)
+        data[["dissolvedOxygen"]][-args.predict_window:].to_numpy().reshape(-1)
     )
     WT_targets = (
-        training_data[["groundwaterTempMean"]][-fut_pred:]
+        data[["groundwaterTempMean"]][-args.predict_window:]
         .to_numpy()
         .reshape(-1)
     )
@@ -118,53 +86,16 @@ def score_model(model, params):
 
 
 def train_model(params, device):
-    df = pd.read_csv("minlake_test.csv", delimiter=",", index_col=0)
-    df = df[df.year > 2019].sort_values(["year", "month", "day"])
-    training_data = df[
-        ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    ]
+    df = get_data(args.csv_name)
+    params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
+    variables = get_variables(params_etcs)
+    training_data = df[variables]
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     training_data_normalized = scaler.fit_transform(training_data)
-    training_data_normalized = torch.from_numpy(training_data_normalized).to(
-        device
-    )
-    model = LSTM(
-        input_size=4,
-        hidden_layer_size=params["lstm_width"],
-        fc_size=params["hidden_width"],
-        output_size=8,
-    ).to(device)
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=params["learning_rate"]
-    )
-
-    epochs = args.epochs
-    train_window = params["train_window"]
-    train_seq = create_sequence(training_data_normalized, train_window)
-
-    for i in range(epochs):
-        model.hidden_cell = (
-            torch.zeros(1, 1, model.hidden_layer_size).to(device),
-            torch.zeros(1, 1, model.hidden_layer_size).to(device),
-        )
-        for seq, targets in train_seq:
-            optimizer.zero_grad()
-            model.float()
-            dist = build_dist(model, seq)
-
-            targets = targets.view(len(targets), -1).float()
-            single_loss = -dist.log_prob(targets)
-            model.hidden_cell = (
-                model.hidden_cell[0].detach(),
-                model.hidden_cell[1].detach(),
-            )
-            single_loss.backward()
-            optimizer.step()
-
-        if i % args.epochs == 1:
-            print(f"epoch: {i:3} loss: {single_loss.item():10.8f}")
-
+    # Training the model
+    params.update(params_etcs)
+    model = train(training_data_normalized, params, args, device, save_flag=False)
     return model
 
 
@@ -172,7 +103,7 @@ def objective(trial):
     params = get_params(trial)
     model = train_model(params, device=0)
     objective = score_model(model, params)
-
+    del model
     return objective
 
 

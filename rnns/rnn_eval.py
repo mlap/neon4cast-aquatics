@@ -38,9 +38,10 @@ def main():
     )
     # Indexing the appropriate data
     end = args.start + params_etcs["train_window"] + args.predict_window
-    evaluation_data = data[args.start : end]
+    evaluation_data = data_scaled[args.start : end]
     # Evaluating the data
-    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etcs)
+    model = torch.load(f"models/{args.model_name}.pkl")
+    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params_etcs, model)
     # Plotting the data
     data_len = len(evaluation_data)
     start_idx = data_len - args.predict_window

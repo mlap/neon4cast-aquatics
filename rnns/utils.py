@@ -10,7 +10,7 @@ import yaml
 
 def make_forecast(args, params_etcs, means, stds):
     """
-    Saves a forecast csv to forecastSITE.csv
+    Saves a forecast csv to forecast[args.csv_name].csv
     """
     dates = pd.date_range(start = args.start_date, end = args.end_date )
     columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen']
@@ -36,11 +36,15 @@ def make_forecast(args, params_etcs, means, stds):
     df.to_csv(f'forecast{params_etcs["csv_name"][:4]}.csv', index=False)
 
 def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
+    """
+    Saves a matplotlib plot of dissolved oxygen and water temperature (or just water temperature if thats inputted)
+    
+    """
     data_len = len(evaluation_data)
     if params_etcs["variable"] == "do":
         fig, axs = plt.subplots(2)
         axs[0].plot(
-            np.linspace(1, data_len, data_len), evaluation_data[["dissolvedOxygen"]]
+            np.linspace(1, data_len, data_len), evaluation_data[:, 2]
         )
         axs[0].errorbar(
             np.linspace(
@@ -54,7 +58,7 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         axs[0].set_title("DO")
         axs[1].plot(
             np.linspace(1, data_len, data_len),
-            evaluation_data[["groundwaterTempMean"]],
+            evaluation_data[:, 0],
         )
         axs[1].errorbar(
             np.linspace(
@@ -71,7 +75,7 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
     elif params_etcs["variable"] == "wt":
         plt.plot(
             np.linspace(1, data_len, data_len),
-            evaluation_data[["groundwaterTempMean"]],
+            evaluation_data[:, 0],
         )
         plt.errorbar(
             np.linspace(
@@ -87,14 +91,17 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         plt.savefig(f"{args.png_name}.png")
 
 
-def evaluate(evaluation_data, condition_seq, args, scaler, params_etcs):
+def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etcs, model):
+    """
+    Returns the mean and std at each time point in the prediction window
+    """
     # Conditioning lstm cells
-    model = torch.load(f"models/{args.model_name}.pkl")
     model.cpu()
     for i in range(1):
         means = np.array([])
         stds = np.array([])
         model.eval()
+        import pdb; pdb.set_trace()
         model.hidden_cell = (
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
@@ -105,7 +112,6 @@ def evaluate(evaluation_data, condition_seq, args, scaler, params_etcs):
     
     dim = seq[-1].shape[0]
     # Now making the predictions
-    evaluation_data_normalized = scaler.transform(evaluation_data)
 
     for i in range(1):
         test_inputs = evaluation_data_normalized[: -args.predict_window]
@@ -132,17 +138,23 @@ def evaluate(evaluation_data, condition_seq, args, scaler, params_etcs):
 
 
 def get_variables(params_etcs):
+    """
+    This returns the variables to select from the dataframe according to
+    """
     # Selecting the right variables 
     if params_etcs["variable"] == "wt":
         vars = ["groundwaterTempMean"]
-    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "BARC_data.csv":
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "BARC_data":
         vars = ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
-    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "POSE_data.csv":
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "POSE_data":
         vars = ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
     
     return vars
 
 def save_etcs(args, params):
+    """
+    Saves important features/file names used in training
+    """
     with open(f"models/{args.file_name}.yaml", 'w') as file:
       params["variable"] = args.variable
       params["epochs"] = args.epochs
@@ -150,12 +162,18 @@ def save_etcs(args, params):
       documents = yaml.dump(params, file)
       
 def load_etcs(model_name):
+    """
+    Yank the important features/file names used in training
+    """
     with open(f"models/{model_name}.yaml") as file:
         etcs = yaml.load(file, Loader=yaml.FullLoader)
     return etcs
     
 
-def train(training_data_normalized, params, args, device):
+def train(training_data_normalized, params, args, device, save_flag):
+    """
+    Trains a model; saves the model along with important features/file names
+    """
     # Accounting for the number of drivers used for water temp vs DO
     if args.variable == "wt":
         input_dim = 1
@@ -203,18 +221,20 @@ def train(training_data_normalized, params, args, device):
 
         if i % 100 == 1:
             print(f"epoch: {i:3} loss: {single_loss.item():10.8f}")
-
     print(f"epoch: {i:3} loss: {single_loss.item():10.10f}")
-
-    torch.save(model, f"models/{args.file_name}.pkl")
-    save_etcs(args, params)
+    
+    if save_flag:
+        torch.save(model, f"models/{args.file_name}.pkl")
+        save_etcs(args, params)
+    else:
+        return model
     
 
 def get_data(csv_name):
     """
     This function reads the csv, and linearly interpolates the missing data
     """
-    df = pd.read_csv(csv_name, delimiter=",", index_col=0)
+    df = pd.read_csv(f"{csv_name}.csv", delimiter=",", index_col=0)
     df = df.sort_values(["year", "month", "day"])
     df = df.reset_index(drop=True)
     df['date'] = pd.to_datetime(df[["year", "month", "day"]])
@@ -229,6 +249,10 @@ def get_data(csv_name):
     return df
 
 def create_sequence(input_data, train_window):
+    """
+    This takes in the data and puts into a list with inputs and targets to
+    train the model
+    """
     seq = []
     L = len(input_data)
     # Loop splits up the data, so you have a slice of the train window and the
@@ -243,13 +267,20 @@ def create_sequence(input_data, train_window):
 
 def build_cov_matrix(var):
     """
-    This function builds a covariance matrix from variates and covariates
+    This function builds a covariance matrix from variates and covariates.
+    After problems with trying to learn the covariance matrix with non-zero
+    cross-terms, I decided to make the assumption that the covariates are zero.
     """
+    # I add a small non-zero term here to avoid occasional instances when variance is evaluated to be zero
     cov_mat = torch.diag(torch.abs(var) + 1e-10)
     return cov_mat
 
 
 def build_dist(model, seq):
+    """
+    This passes the input sequence to the model and then builds a multivariate
+    normal distribution from the output of the model
+    """
     y_pred = model(seq).view(-1)
     mu = y_pred[:seq[-1].shape[0]]
     var = y_pred[seq[-1].shape[0]:]
@@ -258,6 +289,9 @@ def build_dist(model, seq):
 
 
 class LSTM(nn.Module):
+    """
+    Creating an object to handle an LSTM model
+    """
     def __init__(
         self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2
     ):
