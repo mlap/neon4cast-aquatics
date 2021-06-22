@@ -15,7 +15,7 @@ import argparse
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
 parser.add_argument("--variable", type=str, default="do", help="Name of variable being predicted (wt/do)")
-parser.add_argument("--csv-name", type=str, default="POSE_data", help="Name of CSV to use")
+parser.add_argument("--csv-name", type=str, default="BARC_data", help="Name of CSV to use")
 parser.add_argument(
     "--study-name", type=str, default="trash", help="Study name"
 )
@@ -66,22 +66,31 @@ def score_model(model, params):
         -params["train_window"] - args.predict_window : -args.predict_window
     ]
     means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params, model)
-
-    DO_targets = (
-        data[["dissolvedOxygen"]][-args.predict_window:].to_numpy().reshape(-1)
-    )
-    WT_targets = (
-        data[["groundwaterTempMean"]][-args.predict_window:]
-        .to_numpy()
-        .reshape(-1)
-    )
-    objective = (
-        ((means[:, 2] - DO_targets) ** 2).mean()
-        + ((means[:, 2] + stds[:, 2] - DO_targets) ** 2).mean()
-        + ((means[:, 0] - WT_targets) ** 2).mean()
-        + ((means[:, 0] + stds[:, 0] - WT_targets) ** 2).mean()
-    )
-
+    if args.variable == "do":
+        DO_targets = (
+            data[["dissolvedOxygen"]][-args.predict_window:].to_numpy().reshape(-1)
+        )
+        WT_targets = (
+            data[["groundwaterTempMean"]][-args.predict_window:]
+            .to_numpy()
+            .reshape(-1)
+        )
+        objective = (
+            ((means[:, 2] - DO_targets) ** 2).mean()
+            + ((means[:, 2] + stds[:, 2] - DO_targets) ** 2).mean()
+            + ((means[:, 0] - WT_targets) ** 2).mean()
+            + ((means[:, 0] + stds[:, 0] - WT_targets) ** 2).mean()
+        )
+    elif args.variable == "wt":
+        WT_targets = (
+            data[["groundwaterTempMean"]][-args.predict_window:]
+            .to_numpy()
+            .reshape(-1)
+        )
+        objective = (
+            ((means[:, 0] - WT_targets) ** 2).mean()
+            + ((means[:, 0] + stds[:, 0] - WT_targets) ** 2).mean()
+        )
     return objective
 
 
@@ -120,7 +129,7 @@ if __name__ == "__main__":
         storage=storage_name,
         load_if_exists=True,
     )
-    study.optimize(objective, n_trials=25, catch=(ValueError, RuntimeError))
+    study.optimize(objective, n_trials=args.n_trials, catch=(ValueError, RuntimeError))
     # Reporting best trial and making a quick plot to examine hyperparameters
     trial = study.best_trial
     print(f"Best hyperparams: {trial.params}")
