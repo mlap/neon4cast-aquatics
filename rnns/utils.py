@@ -101,7 +101,6 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
         means = np.array([])
         stds = np.array([])
         model.eval()
-        import pdb; pdb.set_trace()
         model.hidden_cell = (
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
@@ -184,6 +183,7 @@ def train(training_data_normalized, params, args, device, save_flag):
         input_dim=input_dim,
         hidden_dim=params["hidden_dim"],
         output_dim=2*input_dim,
+        n_layers=params["n_layers"]
     )
     model = model.to(device)
     training_data_normalized = torch.from_numpy(training_data_normalized).to(
