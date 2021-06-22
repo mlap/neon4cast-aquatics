@@ -1,14 +1,6 @@
-# This needs to be reworked
 import torch
-import torch.nn as nn
-from torch.distributions.multivariate_normal import MultivariateNormal
-import matplotlib.pyplot as plt
 import optuna
-import pandas as pd
-import numpy as np
-from random import shuffle
 from sklearn.preprocessing import MinMaxScaler
-from copy import deepcopy
 from utils import *
 import argparse
 
@@ -57,10 +49,7 @@ def get_params(trial):
 
 
 def score_model(model, params):
-    # model.cpu()
     df = get_data(args.csv_name)
-    params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
-    # params.update(params_etcs)
     variables = get_variables(params)
     data = df[variables]
 

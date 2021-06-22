@@ -8,6 +8,6 @@
   bash tests/test-wt.sh
 }
 
-@test "Testing Tuning"{
+@test "Testing Tuning" {
   bash tests/test-tune.sh
 }
