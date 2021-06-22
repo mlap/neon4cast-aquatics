@@ -14,15 +14,27 @@ import argparse
 
 # Argument parsing block; to get help on this from CL run `python tune_sb3.py -h`
 parser = argparse.ArgumentParser()
-parser.add_argument("--variable", type=str, default="do", help="Name of variable being predicted (wt/do)")
-parser.add_argument("--csv-name", type=str, default="BARC_data", help="Name of CSV to use")
 parser.add_argument(
-    "--study-name", type=str, default="trash", help="Study name"
+    "--variable",
+    type=str,
+    default="do",
+    help="Name of variable being predicted (wt - water temperature, do - water temperature and dissolved oxygen)",
+)
+parser.add_argument(
+    "--csv-name", type=str, default="BARC_data", help="Name of CSV to use"
+)
+parser.add_argument(
+    "--study-name",
+    type=str,
+    default="trash",
+    help="Name the study that will be saved in `studies/`",
 )
 parser.add_argument(
     "--n-trials", type=int, default=int(25), help="Number of tuning trials"
 )
-parser.add_argument("--epochs", type=int, default=1, help="Number of Epochs")
+parser.add_argument(
+    "--epochs", type=int, default=1, help="Number of epochs to train for"
+)
 parser.add_argument(
     "--predict-window",
     type=int,
@@ -35,43 +47,46 @@ args = parser.parse_args()
 def get_params(trial):
     params = {
         "learning_rate": trial.suggest_loguniform("learning_rate", 1e-5, 1),
-        "train_window": trial.suggest_categorical("train_window", [21, 28, 35, 42, 49]),
-        "n_layers": trial.suggest_categorical(
-            "n_layers", [2, 3, 4]
+        "train_window": trial.suggest_categorical(
+            "train_window", [21, 28, 35, 42, 49]
         ),
-        "hidden_dim": trial.suggest_categorical(
-            "hidden_dim", [8, 16, 32]
-        ),
+        "n_layers": trial.suggest_categorical("n_layers", [2, 3, 4]),
+        "hidden_dim": trial.suggest_categorical("hidden_dim", [8, 16, 32]),
     }
     return params
 
 
 def score_model(model, params):
-    #model.cpu()
+    # model.cpu()
     df = get_data(args.csv_name)
     params_etcs = {"variable": args.variable, "csv_name": args.csv_name}
-    #params.update(params_etcs)
+    # params.update(params_etcs)
     variables = get_variables(params)
     data = df[variables]
-    
+
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     data_normalized = scaler.fit_transform(data)
-    
+
     # Conditioning lstm cells
     condition_seq = create_sequence(
-        data_normalized[: -params["train_window"] - args.predict_window], params["train_window"]
+        data_normalized[: -params["train_window"] - args.predict_window],
+        params["train_window"],
     )
     evaluation_data = data_normalized[
         -params["train_window"] - args.predict_window : -args.predict_window
     ]
-    means, stds = evaluate(evaluation_data, condition_seq, args, scaler, params, model)
+    means, stds = evaluate(
+        evaluation_data, condition_seq, args, scaler, params, model
+    )
     if args.variable == "do":
         DO_targets = (
-            data[["dissolvedOxygen"]][-args.predict_window:].to_numpy().reshape(-1)
+            data[["dissolvedOxygen"]][-args.predict_window :]
+            .to_numpy()
+            .reshape(-1)
         )
         WT_targets = (
-            data[["groundwaterTempMean"]][-args.predict_window:]
+            data[["groundwaterTempMean"]][-args.predict_window :]
             .to_numpy()
             .reshape(-1)
         )
@@ -83,14 +98,13 @@ def score_model(model, params):
         )
     elif args.variable == "wt":
         WT_targets = (
-            data[["groundwaterTempMean"]][-args.predict_window:]
+            data[["groundwaterTempMean"]][-args.predict_window :]
             .to_numpy()
             .reshape(-1)
         )
-        objective = (
-            ((means[:, 0] - WT_targets) ** 2).mean()
-            + ((means[:, 0] + stds[:, 0] - WT_targets) ** 2).mean()
-        )
+        objective = ((means[:, 0] - WT_targets) ** 2).mean() + (
+            (means[:, 0] + stds[:, 0] - WT_targets) ** 2
+        ).mean()
     return objective
 
 
@@ -104,7 +118,9 @@ def train_model(params, device):
     training_data_normalized = scaler.fit_transform(training_data)
     # Training the model
     params.update(params_etcs)
-    model = train(training_data_normalized, params, args, device, save_flag=False)
+    model = train(
+        training_data_normalized, params, args, device, save_flag=False
+    )
     return model
 
 
@@ -129,7 +145,9 @@ if __name__ == "__main__":
         storage=storage_name,
         load_if_exists=True,
     )
-    study.optimize(objective, n_trials=args.n_trials, catch=(ValueError, RuntimeError))
+    study.optimize(
+        objective, n_trials=args.n_trials, catch=(ValueError, RuntimeError)
+    )
     # Reporting best trial and making a quick plot to examine hyperparameters
     trial = study.best_trial
     print(f"Best hyperparams: {trial.params}")
