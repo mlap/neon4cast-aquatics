@@ -56,7 +56,7 @@ def main():
     data_len = len(evaluation_data)
     start_idx = data_len - args.predict_window
     end_idx = data_len
-    plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx)
+    plot(scaler.inverse_transform(evaluation_data), means, stds, args, params_etcs, start_idx, end_idx)
 
 
 if __name__ == "__main__":

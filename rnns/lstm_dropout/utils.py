@@ -17,7 +17,7 @@ def make_forecast(args, params_etcs, means, stds):
     dates = pd.date_range(start = args.start_date, end = args.end_date )
     columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen']
     if params_etcs["variable"] == "do":
-      columns.append("temp")
+        columns.append("temp")
     df_means = pd.DataFrame(columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen', 'temp'])
     df_means['time'] = dates
     df_means['siteID'] = params_etcs["csv_name"][:4]
@@ -25,13 +25,13 @@ def make_forecast(args, params_etcs, means, stds):
     df_means['forecast'] = 1
     df_means['data_assimilation'] = 0
     if params_etcs["variable"] == "do":
-      df_means['oxygen'] = means[:, 2]
+        df_means['oxygen'] = means[:, 2]
     df_means['temp'] = means[:, 0]
     
     df_stds = deepcopy(df_means)
     df_stds['statistic'] = 'sd'
     if params_etcs["variable"] == "do":
-      df_stds['oxygen'] = stds[:, 2]
+        df_stds['oxygen'] = stds[:, 2]
     df_stds['temp'] = stds[:, 0]
     
     df = df_means.append(df_stds)
@@ -126,9 +126,8 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
                 samples = np.array([])
                 for i in range(100):
                     samples = np.append(samples, model(seq).numpy()).reshape(-1, dim)
-                import pdb; pdb.set_trace()
                 test_inputs = np.append(
-                    test_inputs, samples.mean(axis=0).numpy()
+                    test_inputs, samples.mean(axis=0)
                 ).reshape(-1, dim)
                 scaled_samples = scaler.inverse_transform(samples)
                 means = np.append(
@@ -137,7 +136,7 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
                 stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
                     -1, dim
                 )
-      
+    test_data = evaluation_data_normalized[-args.predict_window:]
     return means, stds
 
 
@@ -211,7 +210,6 @@ def train(training_data_normalized, params, args, device, save_flag):
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
-            import pdb; pdb.set_trace()
             # Forward pass
             y_pred = model(seq).view(-1)
 
