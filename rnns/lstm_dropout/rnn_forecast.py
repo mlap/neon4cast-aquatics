@@ -20,13 +20,13 @@ parser.add_argument(
 parser.add_argument(
     "--start-date",
     type=str,
-    default="2021-05-01",
+    default="2021-06-01",
     help="Specify the YYYY-MM-DD that the forecast will start",
 )
 parser.add_argument(
     "--end-date",
     type=str,
-    default="2021-05-07",
+    default="2021-06-07",
     help="Specify the YYYY-MM-DD that the forecast will end",
 )
 parser.add_argument(
@@ -63,7 +63,7 @@ def main():
     data_len = len(evaluation_data)
     start_idx = data_len + 1
     end_idx = data_len + 1 + args.predict_window
-    plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx)
+    plot(scaler.inverse_transform(evaluation_data), means, stds, args, params_etcs, start_idx, end_idx)
 
 
 if __name__ == "__main__":

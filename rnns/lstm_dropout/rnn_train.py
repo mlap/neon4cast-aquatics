@@ -32,7 +32,7 @@ params = {
     "train_window": 21,
     "hidden_dim": 64,
     "n_layers": 2,
-    "dropout": 0.75,
+    "dropout": 0.4,
 }
 
 

@@ -102,7 +102,6 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     for i in range(1):
         means = np.array([])
         stds = np.array([])
-        model.eval()
         model.hidden_cell = (
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
             torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
@@ -118,7 +117,6 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
         test_inputs = evaluation_data_normalized[: -args.predict_window]
         means = np.array([])
         stds = np.array([])
-        model.eval()
         for i in range(args.predict_window):
             seq = torch.FloatTensor(test_inputs[-args.predict_window:])
             with torch.no_grad():
@@ -226,7 +224,7 @@ def train(training_data_normalized, params, args, device, save_flag):
             output.backward()
             optimizer.step()
 
-        if i % 100 == 1:
+        if i % 10 == 1:
             print(f"epoch: {i:3} loss: {output.item():10.8f}")
     print(f"epoch: {i:3} loss: {output.item():10.10f}")
     
