@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eml:eml xmlns:eml="https://eml.ecoinformatics.org/eml-2.2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:stmml="http://www.xml-cml.org/schema/stmml-1.2" packageId="1" system="datetime" xsi:schemaLocation="https://eml.ecoinformatics.org/eml-2.2.0 https://eml.ecoinformatics.org/eml-2.2.0/eml.xsd">
+  <dataset>
+    <title>Daily persistence null forecast for nee and lee</title>
+    <creator>
+      <individualName>
+        <givenName>Marcus</givenName>
+        <surName>Lapeyrolerie</surName>
+      </individualName>
+    </creator>
+    <pubDate>2021-06-30</pubDate>
+    <intellectualRights>https://creativecommons.org/licenses/by/4.0/</intellectualRights>
+    <coverage>
+      <temporalCoverage>
+        <rangeOfDates>
+          <beginDate>
+            <calendarDate>2021-06-01</calendarDate>
+          </beginDate>
+          <endDate>
+            <calendarDate>2021-06-07</calendarDate>
+          </endDate>
+        </rangeOfDates>
+      </temporalCoverage>
+    </coverage>
+    <contact>
+      <individualName>
+        <givenName>Marcus</givenName>
+        <surName>Lapeyrolerie</surName>
+      </individualName>
+    </contact>
+    <dataTable>
+      <entityName>forecast</entityName>
+      <entityDescription>Forecasts of water temperature and oxygen</entityDescription>
+      <physical>
+        <objectName>aquatics-2021-06-01-wbears_rnn.csv</objectName>
+        <size unit="bytes">938</size>
+        <authentication method="MD5">ed0d3b3dcff4a86bad7c4bee112515ca</authentication>
+        <dataFormat>
+          <textFormat>
+            <recordDelimiter>
+</recordDelimiter>
+            <attributeOrientation>column</attributeOrientation>
+            <simpleDelimited>
+              <fieldDelimiter>,</fieldDelimiter>
+            </simpleDelimited>
+          </textFormat>
+        </dataFormat>
+      </physical>
+      <attributeList>
+        <attribute>
+          <attributeName>time</attributeName>
+          <attributeDefinition>[dimension]{time}</attributeDefinition>
+          <storageType>date</storageType>
+          <measurementScale>
+            <dateTime>
+              <formatString>YYYY-MM-DD</formatString>
+              <dateTimeDomain/>
+            </dateTime>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>statistic</attributeName>
+          <attributeDefinition>[dimension]{index of ensemble member}</attributeDefinition>
+          <storageType>string</storageType>
+          <measurementScale>
+            <nominal>
+              <nonNumericDomain>
+                <textDomain>
+                  <definition>statistical moment</definition>
+                </textDomain>
+              </nonNumericDomain>
+            </nominal>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>siteID</attributeName>
+          <attributeDefinition>[dimension]{neon site}</attributeDefinition>
+          <storageType>string</storageType>
+          <measurementScale>
+            <nominal>
+              <nonNumericDomain>
+                <textDomain>
+                  <definition>NEON site ID</definition>
+                </textDomain>
+              </nonNumericDomain>
+            </nominal>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>forecast</attributeName>
+          <attributeDefinition>[flag]{whether represents forecast}</attributeDefinition>
+          <storageType>float</storageType>
+          <measurementScale>
+            <ratio>
+              <unit>
+                <standardUnit>dimensionless</standardUnit>
+              </unit>
+              <numericDomain>
+                <numberType>integer</numberType>
+              </numericDomain>
+            </ratio>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>data_assimilation</attributeName>
+          <attributeDefinition>[flag]{whether time step assimilated data}</attributeDefinition>
+          <storageType>float</storageType>
+          <measurementScale>
+            <ratio>
+              <unit>
+                <standardUnit>dimensionless</standardUnit>
+              </unit>
+              <numericDomain>
+                <numberType>integer</numberType>
+              </numericDomain>
+            </ratio>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>oxygen</attributeName>
+          <attributeDefinition>[variable]{disolved oxygen}</attributeDefinition>
+          <storageType>float</storageType>
+          <measurementScale>
+            <ratio>
+              <unit>
+                <standardUnit>dimensionless</standardUnit>
+              </unit>
+              <numericDomain>
+                <numberType>real</numberType>
+              </numericDomain>
+            </ratio>
+          </measurementScale>
+        </attribute>
+        <attribute>
+          <attributeName>temp</attributeName>
+          <attributeDefinition>[variable]{water temperature}</attributeDefinition>
+          <storageType>float</storageType>
+          <measurementScale>
+            <ratio>
+              <unit>
+                <standardUnit>dimensionless</standardUnit>
+              </unit>
+              <numericDomain>
+                <numberType>real</numberType>
+              </numericDomain>
+            </ratio>
+          </measurementScale>
+        </attribute>
+      </attributeList>
+    </dataTable>
+  </dataset>
+  <additionalMetadata>
+    <metadata>
+      <forecast>
+        <drivers>
+          <complexity>2</complexity>
+          <status>present</status>
+        </drivers>
+        <forecast_horizon>7 days</forecast_horizon>
+        <forecast_issue_time>2021-06-30</forecast_issue_time>
+        <forecast_iteration_id>1</forecast_iteration_id>
+        <forecast_project_id>wbears_rnn</forecast_project_id>
+        <initial_conditions>
+          <status>absent</status>
+        </initial_conditions>
+        <metadata_standard_version>0.3</metadata_standard_version>
+        <model_description>
+          <forecast_model_id>lstm</forecast_model_id>
+          <name>Deep long short-term memory network with dropout</name>
+          <repository>https://github.com/mlap/neon4cast-aquatics</repository>
+          <type>machine learning</type>
+        </model_description>
+        <obs_error>
+          <status>absent</status>
+        </obs_error>
+        <parameters>
+          <status>absent</status>
+        </parameters>
+        <process_error>
+          <complexity>4</complexity>
+          <status>data_driven</status>
+        </process_error>
+        <random_effects>
+          <status>absent</status>
+        </random_effects>
+        <timestep>1 day</timestep>
+      </forecast>
+    </metadata>
+  </additionalMetadata>
+</eml:eml>
