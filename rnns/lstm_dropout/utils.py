@@ -18,7 +18,7 @@ def make_forecast(args, params_etcs, means, stds):
     columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen']
     if params_etcs["variable"] == "do":
         columns.append("temp")
-    df_means = pd.DataFrame(columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen', 'temp'])
+    df_means = pd.DataFrame(columns = ['time', 'siteID', 'statistic', 'forecast', 'data_assimilation', 'oxygen', 'temperature'])
     df_means['time'] = dates
     df_means['siteID'] = params_etcs["csv_name"][:4]
     df_means['statistic'] = 'mean'
@@ -26,13 +26,13 @@ def make_forecast(args, params_etcs, means, stds):
     df_means['data_assimilation'] = 0
     if params_etcs["variable"] == "do":
         df_means['oxygen'] = means[:, 2]
-    df_means['temp'] = means[:, 0]
+    df_means['temperature'] = means[:, 0]
     
     df_stds = deepcopy(df_means)
     df_stds['statistic'] = 'sd'
     if params_etcs["variable"] == "do":
         df_stds['oxygen'] = stds[:, 2]
-    df_stds['temp'] = stds[:, 0]
+    df_stds['temperature'] = stds[:, 0]
     
     df = df_means.append(df_stds)
     df.to_csv(f'forecast{params_etcs["csv_name"][:4]}.csv', index=False)
@@ -118,7 +118,7 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
         means = np.array([])
         stds = np.array([])
         for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-args.predict_window:])
+            seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
             with torch.no_grad():
                 # Collect multiple forward passes
                 samples = np.array([])
