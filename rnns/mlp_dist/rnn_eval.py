@@ -14,7 +14,7 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model",
+    default="trash_model_dist",
     help="Name of model to load from `models/`",
 )
 parser.add_argument(
