@@ -10,7 +10,7 @@ parser.add_argument(
     "--csv-name", type=str, default="POSE_data", help="Name of CSV to use"
 )
 parser.add_argument(
-    "--file-name",
+    "--model-name",
     type=str,
     default="trash_model_dist",
     help="Name the model to be saved in `models/`",
