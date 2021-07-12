@@ -1,3 +1,0 @@
-[submodule "rnns/mlp_dist/tests/libs/bats"]
-	path = rnns/mlp_dist/tests/libs/bats
-	url = https://github.com/sstephenson/bats

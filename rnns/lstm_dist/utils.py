@@ -120,7 +120,7 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
         stds = np.array([])
         model.eval()
         for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-args.predict_window:])
+            seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
             with torch.no_grad():
                 dist = build_dist(model, seq)
                 samples = dist.rsample((1000,))
@@ -180,8 +180,9 @@ def train(training_data_normalized, params, args, device, save_flag):
         input_dim = 1
     else:
         input_dim = 4
-    # Initializing the LSTM model and putting everything on the GPU    
-    model = LSTM(
+    # Initializing the LSTM model and putting everything on the GPU
+    nets = {"lstm": LSTM, "gru": GRU}
+    model = nets[args.network.lower()](
         input_dim=input_dim,
         hidden_dim=params["hidden_dim"],
         output_dim=2*input_dim,
@@ -200,10 +201,14 @@ def train(training_data_normalized, params, args, device, save_flag):
     )
     # The training loop
     for i in range(args.epochs):
-        model.hidden_cell = (
-            torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
-            torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
-        )
+        if args.network.lower() == "lstm":
+            model.hidden_cell = (
+                torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
+                torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
+            )
+        else:
+            model.hidden_cell = torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device)
+        
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
@@ -214,10 +219,14 @@ def train(training_data_normalized, params, args, device, save_flag):
             targets = targets.view(len(targets), -1).float()
             single_loss = -dist.log_prob(targets)
             # Detaching to avoid autograd errors
-            model.hidden_cell = (
-                model.hidden_cell[0].detach(),
-                model.hidden_cell[1].detach(),
-            )
+            import pdb; pdb.set_trace()
+            if args.network.lower() == "lstm":
+                model.hidden_cell = (
+                    model.hidden_cell[0].detach(),
+                    model.hidden_cell[1].detach(),
+                )
+            else:
+                model.hidden_cell = model.hidden_cell.detach()
             single_loss.backward()
             optimizer.step()
 
@@ -312,4 +321,26 @@ class LSTM(nn.Module):
             input.view(len(input), 1, -1).float(), self.hidden_cell
         )
         out = self.linear(lstm_out[-1].view(1, -1))
+        return out[-1]
+      
+class GRU(nn.Module):
+    """
+    Creating an object to handle a GRU model
+    """
+    def __init__(
+        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.gru = nn.GRU(input_dim, self.hidden_dim, n_layers)
+        self.linear = nn.Linear(self.hidden_dim, output_dim)
+
+        self.hidden_cell = torch.zeros(n_layers, 1, self.hidden_dim)
+            
+
+    def forward(self, input):
+        gru_out, self.hidden_cell = self.gru(
+            input.view(len(input), 1, -1).float(), self.hidden_cell
+        )
+        out = self.linear(gru_out[-1].view(1, -1))
         return out[-1]
