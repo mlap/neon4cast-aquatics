@@ -10,7 +10,7 @@ parser.add_argument(
     "--csv-name", type=str, default="POSE_data", help="Name of CSV to use"
 )
 parser.add_argument(
-    "--file-name",
+    "--model-name",
     type=str,
     default="trash_model",
     help="Name the model to be saved in `models/`",
@@ -24,12 +24,15 @@ parser.add_argument(
     default="do",
     help="Name of variable being predicted (wt - water temperature, do - water temperature and dissolved oxygen)",
 )
+parser.add_argument(
+    "--network", type=str, default="lstm", help="Type of recurrent net to use"
+)
 args = parser.parse_args()
 
 # Edit hyperparameters here
 params = {
     "learning_rate": 0.000001,
-    "train_window": 21,
+    "train_window": 1,
     "hidden_dim": 64,
     "n_layers": 2,
     "dropout": 0.4,

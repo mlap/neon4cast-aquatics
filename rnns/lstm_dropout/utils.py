@@ -102,10 +102,7 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     for i in range(1):
         means = np.array([])
         stds = np.array([])
-        model.hidden_cell = (
-            torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
-            torch.zeros(params_etcs["n_layers"], 1, model.hidden_dim),
-        )
+        model.init_hidden("cpu")
         for seq, _ in condition_seq:
             with torch.no_grad():
                 model(torch.from_numpy(seq))
@@ -156,10 +153,11 @@ def save_etcs(args, params):
     """
     Saves important features/file names used in training
     """
-    with open(f"models/{args.file_name}.yaml", 'w') as file:
+    with open(f"models/{args.model_name}.yaml", 'w') as file:
       params["variable"] = args.variable
       params["epochs"] = args.epochs
       params["csv_name"] = args.csv_name
+      params["network"] = args.network
       documents = yaml.dump(params, file)
       
 def load_etcs(model_name):
@@ -181,12 +179,14 @@ def train(training_data_normalized, params, args, device, save_flag):
     else:
         input_dim = 4
     # Initializing the LSTM model and putting everything on the GPU    
-    model = LSTM(
+    nets = {"lstm": LSTM, "gru": GRU}
+    model = nets[args.network.lower()](
         input_dim=input_dim,
         hidden_dim=params["hidden_dim"],
         output_dim=input_dim,
         n_layers=params["n_layers"],
-        dropout=params["dropout"]
+        dropout=params["dropout"],
+        device=device,
     )
     model = model.to(device)
     training_data_normalized = torch.from_numpy(training_data_normalized).to(
@@ -201,10 +201,7 @@ def train(training_data_normalized, params, args, device, save_flag):
     )
     # The training loop
     for i in range(args.epochs):
-        model.hidden_cell = (
-            torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
-            torch.zeros(params["n_layers"], 1, model.hidden_dim).to(device),
-        )
+        model.init_hidden(device)
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
@@ -216,10 +213,7 @@ def train(training_data_normalized, params, args, device, save_flag):
             loss = nn.MSELoss()
             output = loss(y_pred, targets)
             # Detaching to avoid autograd errors
-            model.hidden_cell = (
-                model.hidden_cell[0].detach(),
-                model.hidden_cell[1].detach(),
-            )
+            model.detach_hidden()
             # Gradient step
             output.backward()
             optimizer.step()
@@ -229,7 +223,7 @@ def train(training_data_normalized, params, args, device, save_flag):
     print(f"epoch: {i:3} loss: {output.item():10.10f}")
     
     if save_flag:
-        torch.save(model, f"models/{args.file_name}.pkl")
+        torch.save(model, f"models/{args.model_name}.pkl")
         save_etcs(args, params)
     else:
         return model
@@ -282,11 +276,7 @@ class LSTM(nn.Module):
         self.hidden_dim = hidden_dim
         self.lstm = nn.LSTM(input_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear = nn.Linear(self.hidden_dim, output_dim)
-
-        self.hidden_cell = (
-            torch.zeros(n_layers, 1, self.hidden_dim),
-            torch.zeros(n_layers, 1, self.hidden_dim),
-        )
+        self.init_hidden(device)
 
     def forward(self, input):
         lstm_out, self.hidden_cell = self.lstm(
@@ -294,3 +284,43 @@ class LSTM(nn.Module):
         )
         out = self.linear(lstm_out[-1].view(1, -1))
         return out[-1]
+    
+    def init_hidden(self, device):
+        self.hidden_cell = (
+            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
+            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
+        )
+    
+    def detach_hidden(self):
+        self.hidden_cell = (
+                    self.hidden_cell[0].detach(),
+                    self.hidden_cell[1].detach(),
+                )
+      
+class GRU(nn.Module):
+    """
+    Creating an object to handle a GRU model
+    """
+    def __init__(
+        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2, dropout=0.1, device="cpu"
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.gru = nn.GRU(input_dim, self.hidden_dim, n_layers, dropout=dropout)
+        self.linear = nn.Linear(self.hidden_dim, output_dim)
+        self.n_layers = n_layers
+        self.init_hidden(device)
+            
+
+    def forward(self, input):
+        gru_out, self.hidden_cell = self.gru(
+            input.view(len(input), 1, -1).float(), self.hidden_cell
+        )
+        out = self.linear(gru_out[-1].view(1, -1))
+        return out[-1]
+    
+    def init_hidden(self, device):
+        self.hidden_cell = torch.zeros(self.n_layers, 1, self.hidden_dim, device=device)
+    
+    def detach_hidden(self):
+        self.hidden_cell = self.hidden_cell.detach()
