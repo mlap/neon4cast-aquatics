@@ -46,6 +46,8 @@ def main():
     )
     # Indexing the appropriate data
     end = args.start + params_etcs["train_window"] + args.predict_window
+    if end == 0:
+        end = None
     evaluation_data = data_scaled[args.start : end]
     # Evaluating the data
     model = torch.load(f"models/{args.model_name}.pkl")
