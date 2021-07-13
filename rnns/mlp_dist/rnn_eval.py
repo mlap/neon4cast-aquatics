@@ -42,6 +42,8 @@ def main():
     data_scaled = scaler.fit_transform(data)
     # Indexing the appropriate data
     end = args.start + params_etcs["train_window"] + args.predict_window
+    if end == 0:
+        end = None
     evaluation_data = data_scaled[args.start : end]
     # Evaluating the data
     model = torch.load(f"models/{args.model_name}.pkl")
@@ -50,7 +52,7 @@ def main():
     )
     # Plotting the data
     data_len = len(evaluation_data)
-    start_idx = data_len - args.predict_window
+    start_idx = data_len - args.predict_window + 1
     end_idx = data_len
     plot(scaler.inverse_transform(evaluation_data), means, stds, args, params_etcs, start_idx, end_idx)
 
