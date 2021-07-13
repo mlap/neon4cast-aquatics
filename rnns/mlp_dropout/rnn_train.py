@@ -24,18 +24,15 @@ parser.add_argument(
     default="do",
     help="Name of variable being predicted (wt - water temperature, do - water temperature and dissolved oxygen)",
 )
-parser.add_argument(
-    "--network", type=str, default="lstm", help="Type of recurrent net to use"
-)
 args = parser.parse_args()
 
 # Edit hyperparameters here
 params = {
     "learning_rate": 0.000001,
-    "train_window": 1,
-    "hidden_dim": 64,
-    "n_layers": 2,
-    "dropout": 0.4,
+    "train_window": 21,
+    "hidden_dim": 100,
+    "dropout": 0.3,
+    "output_dim": 4,
 }
 
 

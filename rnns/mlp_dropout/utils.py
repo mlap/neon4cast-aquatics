@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributions.multivariate_normal import MultivariateNormal
 import matplotlib
 matplotlib.use('pdf')
@@ -93,34 +94,24 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         plt.savefig(f"{args.png_name}.png")
 
 
-def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etcs, model):
+def evaluate(evaluation_data_normalized, args, scaler, params_etcs, model):
     """
     Returns the mean and std at each time point in the prediction window
     """
-    # Conditioning lstm cells
     model.cpu()
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.init_hidden("cpu")
-        for seq, _ in condition_seq:
-            with torch.no_grad():
-                model(torch.from_numpy(seq))
-    
-    dim = seq[-1].shape[0]
-    # Now making the predictions
 
     for i in range(1):
         test_inputs = evaluation_data_normalized[: -args.predict_window]
         means = np.array([])
         stds = np.array([])
+        dim = params_etcs["output_dim"]
         for i in range(args.predict_window):
             seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
             with torch.no_grad():
                 # Collect multiple forward passes
                 samples = np.array([])
                 for i in range(100):
-                    samples = np.append(samples, model(seq).numpy()).reshape(-1, dim)
+                    samples = np.append(samples, model(seq.reshape(-1)).numpy()).reshape(-1, dim)
                 test_inputs = np.append(
                     test_inputs, samples.mean(axis=0)
                 ).reshape(-1, dim)
@@ -157,7 +148,6 @@ def save_etcs(args, params):
       params["variable"] = args.variable
       params["epochs"] = args.epochs
       params["csv_name"] = args.csv_name
-      params["network"] = args.network
       documents = yaml.dump(params, file)
       
 def load_etcs(model_name):
@@ -175,18 +165,15 @@ def train(training_data_normalized, params, args, device, save_flag):
     """
     # Accounting for the number of drivers used for water temp vs DO
     if args.variable == "wt":
-        input_dim = 1
+        input_dim = 1 *21
     else:
-        input_dim = 4
-    # Initializing the LSTM model and putting everything on the GPU    
-    nets = {"lstm": LSTM, "gru": GRU}
-    model = nets[args.network.lower()](
+        input_dim = 4 * 21
+    # Initializing the MLP model and putting everything on the GPU    
+    model = MLP(
         input_dim=input_dim,
         hidden_dim=params["hidden_dim"],
-        output_dim=input_dim,
-        n_layers=params["n_layers"],
-        dropout=params["dropout"],
-        device=device,
+        output_dim=params["output_dim"],
+        dropout=params["dropout"]
     )
     model = model.to(device)
     training_data_normalized = torch.from_numpy(training_data_normalized).to(
@@ -201,19 +188,15 @@ def train(training_data_normalized, params, args, device, save_flag):
     )
     # The training loop
     for i in range(args.epochs):
-        model.init_hidden(device)
         for seq, targets in train_seq:
             optimizer.zero_grad()
-            model.float()
             # Forward pass
-            y_pred = model(seq).view(-1)
+            y_pred = model(seq.reshape(-1))
 
             targets = targets.view(-1).float()
             # Computing the loss
             loss = nn.MSELoss()
             output = loss(y_pred, targets)
-            # Detaching to avoid autograd errors
-            model.detach_hidden()
             # Gradient step
             output.backward()
             optimizer.step()
@@ -265,62 +248,25 @@ def create_sequence(input_data, train_window):
 
 
 
-class LSTM(nn.Module):
+class MLP(nn.Module):
     """
-    Creating an object to handle an LSTM model
-    """
-    def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2, dropout=0.1
-    ):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.lstm = nn.LSTM(input_dim, hidden_dim, n_layers, dropout=dropout)
-        self.linear = nn.Linear(self.hidden_dim, output_dim)
-        self.init_hidden(device)
-
-    def forward(self, input):
-        lstm_out, self.hidden_cell = self.lstm(
-            input.view(len(input), 1, -1).float(), self.hidden_cell
-        )
-        out = self.linear(lstm_out[-1].view(1, -1))
-        return out[-1]
-    
-    def init_hidden(self, device):
-        self.hidden_cell = (
-            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
-            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
-        )
-    
-    def detach_hidden(self):
-        self.hidden_cell = (
-                    self.hidden_cell[0].detach(),
-                    self.hidden_cell[1].detach(),
-                )
-      
-class GRU(nn.Module):
-    """
-    Creating an object to handle a GRU model
+    Creating an object to handle a MLP model
     """
     def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2, dropout=0.1, device="cpu"
+        self, input_dim=1, hidden_dim=64, output_dim=1, dropout=0.1
     ):
         super().__init__()
-        self.hidden_dim = hidden_dim
-        self.gru = nn.GRU(input_dim, self.hidden_dim, n_layers, dropout=dropout)
-        self.linear = nn.Linear(self.hidden_dim, output_dim)
-        self.n_layers = n_layers
-        self.init_hidden(device)
-            
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, input):
-        gru_out, self.hidden_cell = self.gru(
-            input.view(len(input), 1, -1).float(), self.hidden_cell
-        )
-        out = self.linear(gru_out[-1].view(1, -1))
-        return out[-1]
-    
-    def init_hidden(self, device):
-        self.hidden_cell = torch.zeros(self.n_layers, 1, self.hidden_dim, device=device)
-    
-    def detach_hidden(self):
-        self.hidden_cell = self.hidden_cell.detach()
+        out = self.fc1(input.float())
+        out = self.dropout(out)
+        out = F.relu(out)
+        out = self.fc2(out)
+        out = self.dropout(out)
+        out = F.relu(out)
+        out = self.fc3(out)
+        return out

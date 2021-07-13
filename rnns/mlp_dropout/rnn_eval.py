@@ -14,7 +14,7 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model_dist",
+    default="trash_model",
     help="Name of model to load from `models/`",
 )
 parser.add_argument(
@@ -40,17 +40,13 @@ def main():
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     data_scaled = scaler.fit_transform(data)
-    # Creating a sequence to condition the LSTM cells
-    condition_seq = create_sequence(
-        data_scaled[: args.start], params_etcs["train_window"]
-    )
     # Indexing the appropriate data
     end = args.start + params_etcs["train_window"] + args.predict_window
     evaluation_data = data_scaled[args.start : end]
     # Evaluating the data
     model = torch.load(f"models/{args.model_name}.pkl")
     means, stds = evaluate(
-        evaluation_data, condition_seq, args, scaler, params_etcs, model
+        evaluation_data, args, scaler, params_etcs, model
     )
     # Plotting the data
     data_len = len(evaluation_data)

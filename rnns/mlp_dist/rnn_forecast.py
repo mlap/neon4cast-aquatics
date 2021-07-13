@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--png-name",
     type=str,
-    default="trash",
+    default="trash_forecast",
     help="Name of the png that will be saved in `rnns/`",
 )
 parser.add_argument(
@@ -18,10 +18,16 @@ parser.add_argument(
     help="Name of model to load from `models/`",
 )
 parser.add_argument(
-    "--start",
-    type=int,
-    default=-29,
-    help="Where to start the forecast, (-(how many places from the end))",
+    "--start-date",
+    type=str,
+    default="2021-05-01",
+    help="Specify the YYYY-MM-DD that the forecast will start",
+)
+parser.add_argument(
+    "--end-date",
+    type=str,
+    default="2021-05-07",
+    help="Specify the YYYY-MM-DD that the forecast will end",
 )
 parser.add_argument(
     "--predict-window",
@@ -40,23 +46,24 @@ def main():
     # Normalizing data to -1, 1 scale; this improves performance of neural nets
     scaler = MinMaxScaler(feature_range=(-1, 1))
     data_scaled = scaler.fit_transform(data)
-    # Creating a sequence to condition the LSTM cells
     condition_seq = create_sequence(
-        data_scaled[: args.start], params_etcs["train_window"]
+        data_scaled[: -params_etcs["train_window"]],
+        params_etcs["train_window"],
     )
     # Indexing the appropriate data
-    end = args.start + params_etcs["train_window"] + args.predict_window
-    evaluation_data = data_scaled[args.start : end]
+    evaluation_data = data_scaled[-params_etcs["train_window"] :]
     # Evaluating the data
     model = torch.load(f"models/{args.model_name}.pkl")
     means, stds = evaluate(
         evaluation_data, condition_seq, args, scaler, params_etcs, model
     )
-    # Plotting the data
+
+    make_forecast(args, params_etcs, means, stds)
+
     data_len = len(evaluation_data)
-    start_idx = data_len - args.predict_window
-    end_idx = data_len
-    plot(scaler.inverse_transform(evaluation_data), means, stds, args, params_etcs, start_idx, end_idx)
+    start_idx = data_len + 1
+    end_idx = data_len + 1 + args.predict_window
+    plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx)
 
 
 if __name__ == "__main__":

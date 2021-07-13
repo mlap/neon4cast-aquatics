@@ -12,11 +12,11 @@ parser.add_argument(
 parser.add_argument(
     "--model-name",
     type=str,
-    default="trash_model",
+    default="trash_model_dist",
     help="Name the model to be saved in `models/`",
 )
 parser.add_argument(
-    "--epochs", type=int, default=1, help="Number of epochs to train for"
+    "--epochs", type=int, default=25, help="Number of epochs to train for"
 )
 parser.add_argument(
     "--variable",
@@ -24,18 +24,14 @@ parser.add_argument(
     default="do",
     help="Name of variable being predicted (wt - water temperature, do - water temperature and dissolved oxygen)",
 )
-parser.add_argument(
-    "--network", type=str, default="lstm", help="Type of recurrent net to use"
-)
 args = parser.parse_args()
 
 # Edit hyperparameters here
 params = {
     "learning_rate": 0.000001,
-    "train_window": 1,
+    "train_window": 21,
     "hidden_dim": 64,
-    "n_layers": 2,
-    "dropout": 0.4,
+    "output_dim": 4,
 }
 
 
