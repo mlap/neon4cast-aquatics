@@ -201,7 +201,6 @@ def train(training_data_normalized, params, args, device, save_flag):
     # The training loop
     for i in range(args.epochs):
         model.init_hidden(device)
-        
         for seq, targets in train_seq:
             optimizer.zero_grad()
             model.float()
@@ -309,8 +308,8 @@ class LSTM(nn.Module):
     
     def init_hidden(self, device):
         self.hidden_cell = (
-            torch.zeros(self.n_layers, 1, self.hidden_dim, device),
-            torch.zeros(self.n_layers, 1, self.hidden_dim, device),
+            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
+            torch.zeros(self.n_layers, 1, self.hidden_dim, device=device),
         )
     
     def detach_hidden(self):
