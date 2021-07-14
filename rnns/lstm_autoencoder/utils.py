@@ -45,16 +45,15 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
     data_len = len(evaluation_data)
     if params_etcs["variable"] == "do":
         fig, axs = plt.subplots(2)
-        import pdb; pdb.set_trace()
         axs[0].plot(
-            np.linspace(1, data_len, data_len), evaluation_data[:, 2]
+            np.linspace(1, data_len, data_len), evaluation_data[:, 1]
         )
         axs[0].errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["prediction_window"]
             ),
-            means[:, 2],
-            stds[:, 2],
+            means[:, 1],
+            stds[:, 1],
             capsize=5,
             marker="o",
         )
@@ -65,7 +64,7 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         )
         axs[1].errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["prediction_window"]
             ),
             means[:, 0],
             stds[:, 0],
@@ -82,7 +81,7 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         )
         plt.errorbar(
             np.linspace(
-                start_idx, end_idx, args.predict_window
+                start_idx, end_idx, params_etcs["prediction_window"]
             ),
             means[:, 0],
             stds[:, 0],
@@ -112,27 +111,21 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     # Now making the predictions
 
     for i in range(1):
-        test_inputs = evaluation_data_normalized[: -args.predict_window]
+        test_inputs = evaluation_data_normalized[: -params_etcs["prediction_window"]]
         means = np.array([])
         stds = np.array([])
-        for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
-            with torch.no_grad():
-                # Collect multiple forward passes
-                samples = np.array([])
-                for i in range(100):
-                    samples = np.append(samples, model(seq).numpy()).reshape(-1, dim)
-                test_inputs = np.append(
-                    test_inputs, samples.mean(axis=0)
-                ).reshape(-1, dim)
-                scaled_samples = scaler.inverse_transform(samples)
-                means = np.append(
-                    means, np.mean(scaled_samples, axis=0)
-                ).reshape(-1, dim)
-                stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
-                    -1, dim
-                )
-    test_data = evaluation_data_normalized[-args.predict_window:]
+        with torch.no_grad():
+            # Collect multiple forward passes
+            samples = np.array([])
+            for i in range(100):
+                samples = np.append(samples, model(torch.from_numpy(seq)).numpy().reshape(1, -1, dim)).reshape(i+1, -1, dim)
+            test_inputs = np.append(
+                test_inputs, samples.mean(axis=0)
+            ).reshape(-1, dim)
+            means = scaler.inverse_transform(samples.mean(axis=0))
+            stds = scaler.inverse_transform(samples.std(axis=0))
+            
+    test_data = evaluation_data_normalized[-params_etcs["prediction_window"]:]
     return means, stds
 
 
@@ -259,7 +252,7 @@ def create_sequence(input_data, train_window, prediction_window):
     L = len(input_data)
     # Loop splits up the data, so you have a slice of the train window and the
     # next item.
-    for i in range(L - train_window - (prediction_window+1)):
+    for i in range(L - train_window - (prediction_window-1)):
         train_seq = input_data[i : i + train_window]
         train_target = input_data[i + train_window : i + train_window + prediction_window]
         seq.append((train_seq, train_target))
