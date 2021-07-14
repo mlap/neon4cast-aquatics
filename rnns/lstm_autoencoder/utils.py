@@ -111,21 +111,17 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     # Now making the predictions
 
     for i in range(1):
-        test_inputs = evaluation_data_normalized[: -params_etcs["prediction_window"]]
+        seq = evaluation_data_normalized[: -params_etcs["prediction_window"]]
         means = np.array([])
         stds = np.array([])
         with torch.no_grad():
-            # Collect multiple forward passes
             samples = np.array([])
+            # Collect multiple forward passes
             for i in range(100):
-                samples = np.append(samples, model(torch.from_numpy(seq)).numpy().reshape(1, -1, dim)).reshape(i+1, -1, dim)
-            test_inputs = np.append(
-                test_inputs, samples.mean(axis=0)
-            ).reshape(-1, dim)
-            means = scaler.inverse_transform(samples.mean(axis=0))
-            stds = scaler.inverse_transform(samples.std(axis=0))
+                samples = np.append(samples, scaler.inverse_transform(model(torch.from_numpy(seq)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
+            means = samples.mean(axis=0)
+            stds = samples.std(axis=0)
             
-    test_data = evaluation_data_normalized[-params_etcs["prediction_window"]:]
     return means, stds
 
 
