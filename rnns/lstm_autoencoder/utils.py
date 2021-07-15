@@ -99,14 +99,14 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     """
     # Conditioning lstm cells
     model.cpu()
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.init_hidden("cpu")
-        for seq, _ in condition_seq:
-            with torch.no_grad():
-                model(torch.from_numpy(seq))
-    
+    means = np.array([])
+    stds = np.array([])
+    model.init_hidden("cpu")
+    for seq, _ in condition_seq:
+        with torch.no_grad():
+            model(torch.from_numpy(seq))
+    encoder_hidden_cell = model.hidden_cell_ae
+    decoder_hidden_cell = model.hidden_cell_de
     dim = seq[-1].shape[0]
     # Now making the predictions
 
@@ -119,6 +119,8 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
             # Collect multiple forward passes
             for i in range(100):
                 samples = np.append(samples, scaler.inverse_transform(model(torch.from_numpy(seq)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
+                model.hidden_cell_ae = encoder_hidden_cell 
+                model.hidden_cell_de = decoder_hidden_cell
             means = samples.mean(axis=0)
             stds = samples.std(axis=0)
             
@@ -221,6 +223,7 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
         return model
 
 def train_additional_net(training_data_normalized, params, args, device, save_flag):
+    # WIP
     model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
     model_ae = model_ae.to(device)
     
