@@ -108,21 +108,20 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     encoder_hidden_cell = model.hidden_cell_ae
     decoder_hidden_cell = model.hidden_cell_de
     dim = seq[-1].shape[0]
+    
     # Now making the predictions
-
-    for i in range(1):
-        seq = evaluation_data_normalized[: -params_etcs["prediction_window"]]
-        means = np.array([])
-        stds = np.array([])
-        with torch.no_grad():
-            samples = np.array([])
-            # Collect multiple forward passes
-            for i in range(100):
-                samples = np.append(samples, scaler.inverse_transform(model(torch.from_numpy(seq)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
-                model.hidden_cell_ae = encoder_hidden_cell 
-                model.hidden_cell_de = decoder_hidden_cell
-            means = samples.mean(axis=0)
-            stds = samples.std(axis=0)
+    seq = evaluation_data_normalized[: -params_etcs["prediction_window"]]
+    means = np.array([])
+    stds = np.array([])
+    with torch.no_grad():
+        samples = np.array([])
+        # Collect multiple forward passes
+        for i in range(100):
+            samples = np.append(samples, scaler.inverse_transform(model(torch.from_numpy(seq)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
+            model.hidden_cell_ae = encoder_hidden_cell 
+            model.hidden_cell_de = decoder_hidden_cell
+        means = samples.mean(axis=0)
+        stds = samples.std(axis=0)
             
     return means, stds
 
@@ -218,6 +217,7 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}_ae.pkl")
+        params["final_ae_loss"] = loss
         save_etcs(args, params)
     else:
         return model
