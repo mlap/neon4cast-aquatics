@@ -157,7 +157,7 @@ def save_etcs(args, params):
     """
     Saves important features/file names used in training
     """
-    with open(f"models/{args.model_name}.yaml", 'w') as file:
+    with open(f"models/{args.model_name}_ae.yaml", 'w') as file:
       params["variable"] = args.variable
       params["epochs"] = args.epochs
       params["csv_name"] = args.csv_name
@@ -168,7 +168,7 @@ def load_etcs(model_name):
     """
     Yank the important features/file names used in training
     """
-    with open(f"models/{model_name}.yaml") as file:
+    with open(f"models/{model_name}_ae.yaml") as file:
         etcs = yaml.load(file, Loader=yaml.FullLoader)
     return etcs
     
@@ -237,6 +237,7 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
 
 def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
     # WIP
+    import pdb; pdb.set_trace()
     model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
     model_ae = model_ae.to(device)
     # Accounting for the number of drivers used for water temp vs DO
@@ -263,7 +264,7 @@ def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, s
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params["learning_rate"]
     )
-
+    # Try here again with longer prediction window
     train_seq = create_sequence(
         scaled_data_an, params["train_window"], 1
     )
@@ -272,18 +273,18 @@ def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, s
     )
     # The training loop
     for i in range(args.epochs):
+        import pdb; pdb.set_trace()
         model.init_hidden(device)
         model_ae.init_hidden(device)
         # Going need to get separate data variables for external drivers
-        for i, e in enumerate(train_seq):
-            seq_an, target = e
-            seq_ae = train_seq_ae[i][0]
+        for j, e in enumerate(train_seq):
+            seq_an, targets = e
+            seq_ae = train_seq_ae[j][0]
             # Setting up for gradient descent
             optimizer.zero_grad()
             model.float()
             model_ae(seq_ae)
             ae_embedding = model_ae.embedding
-            import pdb; pdb.set_trace()
             seq = torch.cat((seq_an, ae_embedding), dim=1)
             # Forward pass
             y_pred = model(seq).view(-1)
@@ -294,6 +295,7 @@ def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, s
             output = loss(y_pred, targets)
             # Detaching to avoid autograd errors
             model.detach_hidden()
+            model_ae.detach_hidden()
             # Gradient step
             output.backward()
             optimizer.step()
