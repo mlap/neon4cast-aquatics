@@ -159,7 +159,7 @@ def load_etcs(model_name):
     return etcs
     
 
-def train(training_data_normalized, params, args, device, save_flag):
+def train_ae(training_data_normalized, params, args, device, save_flag):
     """
     Trains a model; saves the model along with important features/file names
     """
@@ -201,6 +201,60 @@ def train(training_data_normalized, params, args, device, save_flag):
             # Forward pass
             y_pred = model(seq).view(-1)
             targets = targets.reshape(-1).float()
+            # Computing the loss
+            loss = nn.MSELoss()
+            output = loss(y_pred, targets)
+            # Detaching to avoid autograd errors
+            model.detach_hidden()
+            # Gradient step
+            output.backward()
+            optimizer.step()
+
+        if i % 10 == 1:
+            print(f"epoch: {i:3} loss: {output.item():10.8f}")
+    print(f"epoch: {i:3} loss: {output.item():10.10f}")
+    
+    if save_flag:
+        torch.save(model, f"models/{args.model_name}_ae.pkl")
+        save_etcs(args, params)
+    else:
+        return model
+
+def train_additional_net(training_data_normalized, params, args, device, save_flag):
+    model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
+    model_ae = model_ae.to(device)
+    
+    model = GRU(
+        input_dim=input_scale,
+        hidden_dim=params["hidden_dim"],
+        output_dim=input_scale * params["prediction_window"],
+        n_layers=params["n_layers"],
+        dropout=params["dropout"],
+        device=device,
+    )
+    model = model.to(device)
+    training_data_normalized = torch.from_numpy(training_data_normalized).to(
+        device
+    )
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=params["learning_rate"]
+    )
+
+    train_seq = create_sequence(
+        training_data_normalized, params["train_window"], 1
+    )
+    # The training loop
+    for i in range(args.epochs):
+        model.init_hidden(device)
+        model_ae.init_hidden(device)
+        # Going need to get separate data variables for external drivers
+        for seq, targets in train_seq:
+            optimizer.zero_grad()
+            model.float()
+            # Forward pass
+            y_pred = model(seq).view(-1)
+
+            targets = targets.view(-1).float()
             # Computing the loss
             loss = nn.MSELoss()
             output = loss(y_pred, targets)
@@ -270,6 +324,7 @@ class LSTMAutoEncoder(nn.Module):
         # Encoder
         self.encoder = nn.LSTM(input_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear_ae = nn.Linear(hidden_dim, embed_dim)
+        self.embedding = None
         # Decoder
         self.decoder = nn.LSTM(embed_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear_de = nn.Linear(hidden_dim, output_dim)
@@ -279,9 +334,9 @@ class LSTMAutoEncoder(nn.Module):
         lstm_out, self.hidden_cell_ae = self.encoder(
             input.view(len(input), 1, -1).float(), self.hidden_cell_ae
         )
-        embedding = self.linear_ae(lstm_out[-1].view(1, -1))
+        self.embedding = self.linear_ae(lstm_out[-1].view(1, -1))
         lstm_out, self.hidden_cell_de = self.decoder(
-            embedding.view(len(embedding), 1, -1).float(), self.hidden_cell_de
+            self.embedding.view(len(self.embedding), 1, -1).float(), self.hidden_cell_de
         )
         out = self.linear_de(lstm_out[-1].view(1, -1))
         return out[-1]
