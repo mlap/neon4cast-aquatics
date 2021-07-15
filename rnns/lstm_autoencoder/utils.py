@@ -125,8 +125,21 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
             
     return means, stds
 
+def get_variables_an(params_etcs):
+    """
+    This returns the variables to select from the dataframe according to
+    """
+    # Selecting the right variables 
+    if params_etcs["variable"] == "wt":
+        vars = ["groundwaterTempMean"]
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "BARC_data":
+        vars = ["groundwaterTempMean", "uPARMean", "dissolvedOxygen", "chlorophyll"]
+    elif params_etcs["variable"] == "do" and params_etcs["csv_name"] == "POSE_data":
+        vars = ["groundwaterTempMean", "turbidity", "dissolvedOxygen", "chlorophyll"]
+    
+    return vars
 
-def get_variables(params_etcs):
+def get_variables_ae(params_etcs):
     """
     This returns the variables to select from the dataframe according to
     """
@@ -212,8 +225,8 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
             optimizer.step()
 
         if i % 10 == 1:
-            print(f"epoch: {i:3} loss: {output.item():10.8f}")
-    print(f"epoch: {i:3} loss: {output.item():10.10f}")
+            print(f"AE epoch: {i:3} loss: {output.item():10.8f}")
+    print(f"AE epoch: {i:3} loss: {output.item():10.10f}")
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}_ae.pkl")
@@ -222,38 +235,56 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
     else:
         return model
 
-def train_additional_net(training_data_normalized, params, args, device, save_flag):
+def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
     # WIP
     model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
     model_ae = model_ae.to(device)
-    
+    # Accounting for the number of drivers used for water temp vs DO
+    if args.variable == "wt":
+        input_dim = 1
+    else:
+        input_dim = 4
     model = GRU(
-        input_dim=input_scale,
+        input_dim=input_dim + model_ae.embed_dim,
         hidden_dim=params["hidden_dim"],
-        output_dim=input_scale * params["prediction_window"],
+        output_dim=input_dim,
         n_layers=params["n_layers"],
         dropout=params["dropout"],
         device=device,
     )
     model = model.to(device)
-    training_data_normalized = torch.from_numpy(training_data_normalized).to(
+    scaled_data_an = torch.from_numpy(scaled_data_an).to(
         device
     )
+    scaled_data_ae = torch.from_numpy(scaled_data_ae).to(
+        device
+    )
+    
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params["learning_rate"]
     )
 
     train_seq = create_sequence(
-        training_data_normalized, params["train_window"], 1
+        scaled_data_an, params["train_window"], 1
+    )
+    train_seq_ae = create_sequence(
+        scaled_data_ae, params["train_window"], 1
     )
     # The training loop
     for i in range(args.epochs):
         model.init_hidden(device)
         model_ae.init_hidden(device)
         # Going need to get separate data variables for external drivers
-        for seq, targets in train_seq:
+        for i, e in enumerate(train_seq):
+            seq_an, target = e
+            seq_ae = train_seq_ae[i][0]
+            # Setting up for gradient descent
             optimizer.zero_grad()
             model.float()
+            model_ae(seq_ae)
+            ae_embedding = model_ae.embedding
+            import pdb; pdb.set_trace()
+            seq = torch.cat((seq_an, ae_embedding), dim=1)
             # Forward pass
             y_pred = model(seq).view(-1)
 
@@ -268,11 +299,11 @@ def train_additional_net(training_data_normalized, params, args, device, save_fl
             optimizer.step()
 
         if i % 10 == 1:
-            print(f"epoch: {i:3} loss: {output.item():10.8f}")
-    print(f"epoch: {i:3} loss: {output.item():10.10f}")
+            print(f"AN epoch: {i:3} loss: {output.item():10.8f}")
+    print(f"AN epoch: {i:3} loss: {output.item():10.10f}")
     
     if save_flag:
-        torch.save(model, f"models/{args.model_name}.pkl")
+        torch.save(model, f"models/{args.model_name}_an.pkl")
         save_etcs(args, params)
     else:
         return model
@@ -328,6 +359,7 @@ class LSTMAutoEncoder(nn.Module):
         self.encoder = nn.LSTM(input_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear_ae = nn.Linear(hidden_dim, embed_dim)
         self.embedding = None
+        self.embed_dim = embed_dim
         # Decoder
         self.decoder = nn.LSTM(embed_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear_de = nn.Linear(hidden_dim, output_dim)
