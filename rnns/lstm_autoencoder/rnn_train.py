@@ -36,8 +36,8 @@ params = {
     "train_window": 1,
     "hidden_dim": 100,
     "embed_dim": 7,
-    "n_layers": 2,
-    "dropout": 0.1,
+    "n_layers": 3,
+    "dropout": 0.3,
     "prediction_window": 7,
 }
 

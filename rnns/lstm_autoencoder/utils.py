@@ -237,7 +237,6 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
 
 def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
     # WIP
-    import pdb; pdb.set_trace()
     model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
     model_ae = model_ae.to(device)
     # Accounting for the number of drivers used for water temp vs DO
@@ -273,7 +272,6 @@ def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, s
     )
     # The training loop
     for i in range(args.epochs):
-        import pdb; pdb.set_trace()
         model.init_hidden(device)
         model_ae.init_hidden(device)
         # Going need to get separate data variables for external drivers
