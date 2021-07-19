@@ -173,7 +173,7 @@ def load_etcs(model_name):
     return etcs
     
 
-def train_ae(training_data_normalized, params, args, device, save_flag):
+def train_autoencoder(training_data_normalized, params, args, device, save_flag):
     """
     Trains a model; saves the model along with important features/file names
     """
@@ -235,7 +235,7 @@ def train_ae(training_data_normalized, params, args, device, save_flag):
     else:
         return model
 
-def train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
+def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
     # WIP
     model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
     model_ae = model_ae.to(device)

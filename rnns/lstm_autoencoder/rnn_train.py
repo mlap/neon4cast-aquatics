@@ -27,7 +27,7 @@ parser.add_argument(
 parser.add_argument(
     "--network", type=str, default="lstm_ae", help="Type of recurrent net to use"
 )
-parser.add_argument("--additional-net", action="store_true")
+parser.add_argument("--predictive-net", action="store_true")
 args = parser.parse_args()
 
 # Edit hyperparameters here
@@ -41,8 +41,11 @@ params = {
     "prediction_window": 7,
 }
 
-def get_scaled_data(additional_net_flag, params_etcs, df):
-    if additional_net_flag:
+def get_scaled_data(predictive_net_flag, params_etcs, df):
+    """
+    This function returns the appropriate data for the predictive net or AE.
+    """
+    if predictive_net_flag:
         util_dict = {"get_variables": get_variables_an}
     else:
         util_dict = {"get_variables": get_variables_ae}
@@ -54,13 +57,13 @@ def get_scaled_data(additional_net_flag, params_etcs, df):
 
 def main(device):
     df = get_data(args.csv_name)
-    params_etcs = {"variable": args.variable, "csv_name": args.csv_name, "addition_net": args.additional_net}
+    params_etcs = {"variable": args.variable, "csv_name": args.csv_name, "predictive_net": args.predictive_net}
     scaler_ae, scaled_data_ae = get_scaled_data(False, params_etcs, df)
     # Training the model
-    train_ae(scaled_data_ae, params, args, device, save_flag=True)
-    if args.additional_net:
-        scaler_an, scaled_data_an = get_scaled_data(args.additional_net, params_etcs, df)
-        train_additional_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag=True)
+    train_autoencoder(scaled_data_ae, params, args, device, save_flag=True)
+    if args.predictive_net:
+        scaler_pn, scaled_data_pn = get_scaled_data(args.predictive_net, params_etcs, df)
+        train_predictive_net(scaled_data_pn, scaled_data_ae, params, args, device, save_flag=True)
 
 
 if __name__ == "__main__":
