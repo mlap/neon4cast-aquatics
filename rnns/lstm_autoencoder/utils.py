@@ -276,16 +276,17 @@ def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, s
         model_ae.init_hidden(device)
         # Going need to get separate data variables for external drivers
         for j, e in enumerate(train_seq):
-            seq_an, targets = e
-            seq_ae = train_seq_ae[j][0]
+            import pdb; pdb.set_trace()
+            seq_pn, targets = e
+            seq_ae, _ = train_seq_ae[j]
             # Setting up for gradient descent
             optimizer.zero_grad()
             model.float()
             model_ae(seq_ae)
             ae_embedding = model_ae.embedding
-            seq = torch.cat((seq_an, ae_embedding), dim=1)
+            seq = torch.cat((seq_pn[-1], ae_embedding[0]), dim=0)
             # Forward pass
-            y_pred = model(seq).view(-1)
+            y_pred = model(seq.reshape(1, -1)).view(-1)
 
             targets = targets.view(-1).float()
             # Computing the loss
