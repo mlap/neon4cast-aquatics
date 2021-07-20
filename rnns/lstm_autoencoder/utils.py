@@ -93,37 +93,139 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
         plt.savefig(f"{args.png_name}.png")
 
 
-def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etcs, model):
+def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models):
     """
     Returns the mean and std at each time point in the prediction window
     """
     # Conditioning lstm cells
-    model.cpu()
+    model_ae, model_pn = models
+    model_ae.cpu()
+    model_pn.cpu()
     means = np.array([])
     stds = np.array([])
-    model.init_hidden("cpu")
-    for seq, _ in condition_seq:
+    model_ae.init_hidden("cpu")
+    model_pn.init_hidden("cpu")
+    condition_seq_ae, condition_seq_pn = condition_seqs
+    for i, e in enumerate(condition_seq_ae):
         with torch.no_grad():
-            model(torch.from_numpy(seq))
-    encoder_hidden_cell = model.hidden_cell_ae
-    decoder_hidden_cell = model.hidden_cell_de
-    dim = seq[-1].shape[0]
+            seq_ae, _ = e
+            seq_pn, _ = condition_seq_pn[i]
+            model_ae(torch.from_numpy(seq_ae))
+            ae_embedding = model_ae.embedding
+            # I want the same input sequence from the predictive network but the last item
+            seq = torch.cat((torch.from_numpy(seq_pn[-1]), ae_embedding[0]), dim=0)
+            # Forward pass
+            y_pred = model_pn(seq.reshape(1, -1)).view(-1)
+    
     
     # Now making the predictions
-    seq = evaluation_data_normalized[: -params_etcs["prediction_window"]]
+    evaluation_data_ae, evaluation_data_an = evaluation_data
+    seq_ae = evaluation_data_ae[: -params_etcs["prediction_window"]]
+    input_pn = evaluation_data_an[-params_etcs["prediction_window"] - 1]
+    dim = input_pn.shape[0]
     means = np.array([])
     stds = np.array([])
     with torch.no_grad():
         samples = np.array([])
-        # Collect multiple forward passes
-        for i in range(100):
-            samples = np.append(samples, scaler.inverse_transform(model(torch.from_numpy(seq)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
-            model.hidden_cell_ae = encoder_hidden_cell 
-            model.hidden_cell_de = decoder_hidden_cell
+        for day in range(params_etcs["prediction_window"]):
+            # Making sure the autoencoder keeps the correct hidden cell        
+            encoder_hidden_cell = model_ae.hidden_cell_ae
+            decoder_hidden_cell = model_ae.hidden_cell_de
+            # Likewise with the predictive network
+            predictive_hidden_cell = model_pn.hidden_cell
+            # Collect multiple forward passes
+            for i in range(100):
+                model_ae.hidden_cell_ae = encoder_hidden_cell 
+                model_ae.hidden_cell_de = decoder_hidden_cell
+                model_pn.hidden_cell = predictive_hidden_cell
+                ae_pred = model_ae(torch.from_numpy(seq_ae))
+                ae_embedding = model_ae.embedding
+                seq = torch.cat((torch.from_numpy(input_pn), ae_embedding[0]), dim=0)
+                samples = np.append(samples, scaler.inverse_transform(model_pn(seq.reshape(1, -1)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
+                input_pn = samples.mean(axis=0)[-1]
+                import pdb; pdb.set_trace()
+                seq_ae = np.append(evaluation_data_ae, ae_pred).reshape(-1, 2)
+                seq_ae = seq_ae[:-params_etcs["prediction_window"]]
         means = samples.mean(axis=0)
         stds = samples.std(axis=0)
             
     return means, stds
+
+#def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
+#    # WIP
+#    model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
+#    model_ae = model_ae.to(device)
+#    # Accounting for the number of drivers used for water temp vs DO
+#    if args.variable == "wt":
+#        input_dim = 1
+#    else:
+#        input_dim = 4
+#    model = GRU(
+#        input_dim=input_dim + model_ae.embed_dim,
+#        hidden_dim=params["hidden_dim"],
+#        output_dim=input_dim,
+#        n_layers=params["n_layers"],
+#        dropout=params["dropout"],
+#        device=device,
+#    )
+#    model = model.to(device)
+#    scaled_data_an = torch.from_numpy(scaled_data_an).to(
+#        device
+#    )
+#    scaled_data_ae = torch.from_numpy(scaled_data_ae).to(
+#        device
+#    )
+#    
+#    optimizer = torch.optim.Adam(
+#        model.parameters(), lr=params["learning_rate"]
+#    )
+#    # Try here again with longer prediction window
+#    train_seq = create_sequence(
+#        scaled_data_an, params["train_window"], 1
+#    )
+#    train_seq_ae = create_sequence(
+#        scaled_data_ae, params["train_window"], 1
+#    )
+#    # The training loop
+#    for i in range(args.epochs):
+#        model.init_hidden(device)
+#        model_ae.init_hidden(device)
+#        # Going need to get separate data variables for external drivers
+#        for j, e in enumerate(train_seq):
+#            import pdb; pdb.set_trace()
+#            seq_pn, targets = e
+#            seq_ae, _ = train_seq_ae[j]
+#            # Setting up for gradient descent
+#            optimizer.zero_grad()
+#            model.float()
+#            model_ae(seq_ae)
+#            ae_embedding = model_ae.embedding
+#            seq = torch.cat((seq_pn[-1], ae_embedding[0]), dim=0)
+#            # Forward pass
+#            y_pred = model(seq.reshape(1, -1)).view(-1)
+#
+#            targets = targets.view(-1).float()
+#            # Computing the loss
+#            loss = nn.MSELoss()
+#            output = loss(y_pred, targets)
+#            # Detaching to avoid autograd errors
+#            model.detach_hidden()
+#            model_ae.detach_hidden()
+#            # Gradient step
+#            output.backward()
+#            optimizer.step()
+#
+#        if i % 10 == 1:
+#            print(f"AN epoch: {i:3} loss: {output.item():10.8f}")
+#    print(f"AN epoch: {i:3} loss: {output.item():10.10f}")
+#    
+#    if save_flag:
+#        torch.save(model, f"models/{args.model_name}_an.pkl")
+#        params["final_ae_loss"] = output.item()
+#        save_etcs(args, params)
+#    else:
+#        return model
+
 
 def get_variables_an(params_etcs):
     """
@@ -230,7 +332,7 @@ def train_autoencoder(training_data_normalized, params, args, device, save_flag)
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}_ae.pkl")
-        params["final_ae_loss"] = loss
+        params["final_ae_loss"] = output.item()
         save_etcs(args, params)
     else:
         return model
@@ -276,7 +378,6 @@ def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, s
         model_ae.init_hidden(device)
         # Going need to get separate data variables for external drivers
         for j, e in enumerate(train_seq):
-            import pdb; pdb.set_trace()
             seq_pn, targets = e
             seq_ae, _ = train_seq_ae[j]
             # Setting up for gradient descent
@@ -304,7 +405,8 @@ def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, s
     print(f"AN epoch: {i:3} loss: {output.item():10.10f}")
     
     if save_flag:
-        torch.save(model, f"models/{args.model_name}_an.pkl")
+        torch.save(model, f"models/{args.model_name}_pn.pkl")
+        params["final_ae_loss"] = output.item()
         save_etcs(args, params)
     else:
         return model

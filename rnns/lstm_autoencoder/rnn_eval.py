@@ -23,30 +23,50 @@ parser.add_argument(
     default=-29,
     help="Where to start the forecast, (-(how many places from the end))",
 )
+parser.add_argument("--predictive-net", action="store_true")
 args = parser.parse_args()
 
+def get_scaled_data(predictive_net_flag, params_etcs, df):
+    """
+    This function returns the appropriate data for the predictive net or AE.
+    """
+    if predictive_net_flag:
+        util_dict = {"get_variables": get_variables_an}
+    else:
+        util_dict = {"get_variables": get_variables_ae}
+    variables = util_dict["get_variables"](params_etcs)
+    training_data = df[variables]
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    scaled_data = scaler.fit_transform(training_data)
+    return scaler, scaled_data
 
 def main():
     params_etcs = load_etcs(args.model_name)
     df = get_data(params_etcs["csv_name"])
-    variables = get_variables(params_etcs)
-    data = df[variables]
-    # Normalizing data to -1, 1 scale; this improves performance of neural nets
-    scaler = MinMaxScaler(feature_range=(-1, 1))
-    data_scaled = scaler.fit_transform(data)
-    # Creating a sequence to condition the LSTM cells
-    condition_seq = create_sequence(
-        data_scaled[: args.start], params_etcs["train_window"], params_etcs["prediction_window"]
+    scaler_ae, scaled_data_ae = get_scaled_data(False, params_etcs, df)
+    scaler_pn, scaled_data_pn = get_scaled_data(True, params_etcs, df)
+    # Creating sequences to condition the LSTM cells
+    condition_seq_ae = create_sequence(
+        scaled_data_ae[: args.start], params_etcs["train_window"], 1
     )
+    condition_seq_pn = create_sequence(
+        scaled_data_pn[: args.start], params_etcs["train_window"], 1
+    )
+    condition_seqs = (condition_seq_ae, condition_seq_pn)
     # Indexing the appropriate data
     end = args.start + params_etcs["train_window"] + params_etcs["prediction_window"]
-    if end == 0:
+    if end >= 0:
         end = None
-    evaluation_data = data_scaled[args.start : end]
+    evaluation_data_ae = scaled_data_ae[args.start : end]
+    evaluation_data_pn = scaled_data_pn[args.start : end]
+    evaluation_data = (evaluation_data_ae, evaluation_data_pn)
+    
     # Evaluating the data
-    model = torch.load(f"models/{args.model_name}.pkl")
+    model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
+    model_pn = torch.load(f"models/{args.model_name}_pn.pkl")
+    models = (model_ae, model_pn)
     means, stds = evaluate(
-        evaluation_data, condition_seq, args, scaler, params_etcs, model
+        evaluation_data, condition_seqs, args, scaler_pn, params_etcs, models
     )
     # Plotting the data
     data_len = len(evaluation_data)
