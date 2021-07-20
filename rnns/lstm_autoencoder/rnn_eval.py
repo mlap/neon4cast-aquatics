@@ -69,10 +69,10 @@ def main():
         evaluation_data, condition_seqs, args, scaler_pn, params_etcs, models
     )
     # Plotting the data
-    data_len = len(evaluation_data)
+    data_len = len(evaluation_data_pn)
     start_idx = data_len - params_etcs["prediction_window"] + 1
     end_idx = data_len
-    plot(scaler.inverse_transform(evaluation_data), means, stds, args, params_etcs, start_idx, end_idx)
+    plot(scaler_pn.inverse_transform(evaluation_data_pn), means, stds, args, params_etcs, start_idx, end_idx)
 
 
 if __name__ == "__main__":

@@ -52,8 +52,8 @@ def plot(evaluation_data, means, stds, args, params_etcs, start_idx, end_idx):
             np.linspace(
                 start_idx, end_idx, params_etcs["prediction_window"]
             ),
-            means[:, 1],
-            stds[:, 1],
+            means[:, 2],
+            stds[:, 2],
             capsize=5,
             marker="o",
         )
@@ -126,8 +126,10 @@ def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models)
     means = np.array([])
     stds = np.array([])
     with torch.no_grad():
-        samples = np.array([])
+        samples_final = np.array([])
         for day in range(params_etcs["prediction_window"]):
+            samples = np.array([])
+            samples_ae = np.array([])
             # Making sure the autoencoder keeps the correct hidden cell        
             encoder_hidden_cell = model_ae.hidden_cell_ae
             decoder_hidden_cell = model_ae.hidden_cell_de
@@ -140,91 +142,21 @@ def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models)
                 model_pn.hidden_cell = predictive_hidden_cell
                 ae_pred = model_ae(torch.from_numpy(seq_ae))
                 ae_embedding = model_ae.embedding
-                seq = torch.cat((torch.from_numpy(input_pn), ae_embedding[0]), dim=0)
+                try:
+                    seq = torch.cat((torch.from_numpy(input_pn).reshape(-1), ae_embedding.reshape(-1)), dim=0).reshape(1, -1)
+                except:
+                    import pdb; pdb.set_trace()
                 samples = np.append(samples, scaler.inverse_transform(model_pn(seq.reshape(1, -1)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
-                input_pn = samples.mean(axis=0)[-1]
-                import pdb; pdb.set_trace()
-                seq_ae = np.append(evaluation_data_ae, ae_pred).reshape(-1, 2)
-                seq_ae = seq_ae[:-params_etcs["prediction_window"]]
-        means = samples.mean(axis=0)
-        stds = samples.std(axis=0)
+                samples_ae = np.append(samples_ae, ae_pred).reshape(-1, 14)
+            #import pdb; pdb.set_trace()
+            ae_pred = samples_ae.mean(axis=0)
+            input_pn = scaler.transform(samples.mean(axis=0))
+            seq_ae = np.append(evaluation_data_ae, ae_pred.reshape(-1,2)).reshape(-1, 2)[day+1:day+1+params_etcs["train_window"]]
+            samples_final = np.append(samples_final, samples).reshape(day+1, -1, dim)
+        means = samples_final.mean(axis=1)
+        stds = samples_final.std(axis=1)
             
     return means, stds
-
-#def train_predictive_net(scaled_data_an, scaled_data_ae, params, args, device, save_flag):
-#    # WIP
-#    model_ae = torch.load(f"models/{args.model_name}_ae.pkl")
-#    model_ae = model_ae.to(device)
-#    # Accounting for the number of drivers used for water temp vs DO
-#    if args.variable == "wt":
-#        input_dim = 1
-#    else:
-#        input_dim = 4
-#    model = GRU(
-#        input_dim=input_dim + model_ae.embed_dim,
-#        hidden_dim=params["hidden_dim"],
-#        output_dim=input_dim,
-#        n_layers=params["n_layers"],
-#        dropout=params["dropout"],
-#        device=device,
-#    )
-#    model = model.to(device)
-#    scaled_data_an = torch.from_numpy(scaled_data_an).to(
-#        device
-#    )
-#    scaled_data_ae = torch.from_numpy(scaled_data_ae).to(
-#        device
-#    )
-#    
-#    optimizer = torch.optim.Adam(
-#        model.parameters(), lr=params["learning_rate"]
-#    )
-#    # Try here again with longer prediction window
-#    train_seq = create_sequence(
-#        scaled_data_an, params["train_window"], 1
-#    )
-#    train_seq_ae = create_sequence(
-#        scaled_data_ae, params["train_window"], 1
-#    )
-#    # The training loop
-#    for i in range(args.epochs):
-#        model.init_hidden(device)
-#        model_ae.init_hidden(device)
-#        # Going need to get separate data variables for external drivers
-#        for j, e in enumerate(train_seq):
-#            import pdb; pdb.set_trace()
-#            seq_pn, targets = e
-#            seq_ae, _ = train_seq_ae[j]
-#            # Setting up for gradient descent
-#            optimizer.zero_grad()
-#            model.float()
-#            model_ae(seq_ae)
-#            ae_embedding = model_ae.embedding
-#            seq = torch.cat((seq_pn[-1], ae_embedding[0]), dim=0)
-#            # Forward pass
-#            y_pred = model(seq.reshape(1, -1)).view(-1)
-#
-#            targets = targets.view(-1).float()
-#            # Computing the loss
-#            loss = nn.MSELoss()
-#            output = loss(y_pred, targets)
-#            # Detaching to avoid autograd errors
-#            model.detach_hidden()
-#            model_ae.detach_hidden()
-#            # Gradient step
-#            output.backward()
-#            optimizer.step()
-#
-#        if i % 10 == 1:
-#            print(f"AN epoch: {i:3} loss: {output.item():10.8f}")
-#    print(f"AN epoch: {i:3} loss: {output.item():10.10f}")
-#    
-#    if save_flag:
-#        torch.save(model, f"models/{args.model_name}_an.pkl")
-#        params["final_ae_loss"] = output.item()
-#        save_etcs(args, params)
-#    else:
-#        return model
 
 
 def get_variables_an(params_etcs):
