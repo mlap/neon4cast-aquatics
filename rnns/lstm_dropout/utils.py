@@ -99,38 +99,41 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     """
     # Conditioning lstm cells
     model.cpu()
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.init_hidden("cpu")
-        for seq, _ in condition_seq:
-            with torch.no_grad():
-                model(torch.from_numpy(seq))
+    means = np.array([])
+    stds = np.array([])
+    model.init_hidden("cpu")
+    for seq, _ in condition_seq:
+        with torch.no_grad():
+            model(torch.from_numpy(seq))
     
     dim = seq[-1].shape[0]
     # Now making the predictions
 
-    for i in range(1):
-        test_inputs = evaluation_data_normalized[: -args.predict_window]
-        means = np.array([])
-        stds = np.array([])
-        for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
-            with torch.no_grad():
-                # Collect multiple forward passes
-                samples = np.array([])
-                for i in range(100):
-                    samples = np.append(samples, model(seq).numpy()).reshape(-1, dim)
-                test_inputs = np.append(
-                    test_inputs, samples.mean(axis=0)
-                ).reshape(-1, dim)
-                scaled_samples = scaler.inverse_transform(samples)
-                means = np.append(
-                    means, np.mean(scaled_samples, axis=0)
-                ).reshape(-1, dim)
-                stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
-                    -1, dim
-                )
+    test_inputs = evaluation_data_normalized[: -args.predict_window]
+    means = np.array([])
+    stds = np.array([])
+    for i in range(args.predict_window):
+        hidden_cell = model.hidden_cell
+        seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
+        with torch.no_grad():
+            # Collect multiple forward passes
+            samples = np.array([])
+            for i in range(100):
+                samples = np.append(samples, model(seq).numpy()).reshape(-1, dim)
+                # This is to use the same hidden cell config on each evaluation
+                # At the last iteration the hidden_cell will evolve for the next time step
+                if i < 99:
+                    model.hidden_cell = hidden_cell 
+            test_inputs = np.append(
+                test_inputs, samples.mean(axis=0)
+            ).reshape(-1, dim)
+            scaled_samples = scaler.inverse_transform(samples)
+            means = np.append(
+                means, np.mean(scaled_samples, axis=0)
+            ).reshape(-1, dim)
+            stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
+                -1, dim
+            )
     test_data = evaluation_data_normalized[-args.predict_window:]
     return means, stds
 
@@ -224,6 +227,7 @@ def train(training_data_normalized, params, args, device, save_flag):
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}.pkl")
+        params["final_loss"] = output.item()
         save_etcs(args, params)
     else:
         return model
@@ -270,10 +274,11 @@ class LSTM(nn.Module):
     Creating an object to handle an LSTM model
     """
     def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2, dropout=0.1
+        self, input_dim=1, hidden_dim=64, output_dim=1, n_layers=2, dropout=0.1, device="cpu"
     ):
         super().__init__()
         self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
         self.lstm = nn.LSTM(input_dim, hidden_dim, n_layers, dropout=dropout)
         self.linear = nn.Linear(self.hidden_dim, output_dim)
         self.init_hidden(device)

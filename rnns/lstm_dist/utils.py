@@ -99,38 +99,36 @@ def evaluate(evaluation_data_normalized, condition_seq, args, scaler, params_etc
     """
     # Conditioning lstm cells
     model.cpu()
-    for i in range(1):
-        means = np.array([])
-        stds = np.array([])
-        model.eval()
-        model.init_hidden("cpu")
-        for seq, _ in condition_seq:
-            with torch.no_grad():
-                dist = build_dist(model, torch.Tensor(seq))
+    means = np.array([])
+    stds = np.array([])
+    model.eval()
+    model.init_hidden("cpu")
+    for seq, _ in condition_seq:
+        with torch.no_grad():
+            dist = build_dist(model, torch.Tensor(seq))
     
     dim = seq[-1].shape[0]
     # Now making the predictions
 
-    for i in range(1):
-        test_inputs = evaluation_data_normalized[: -args.predict_window]
-        means = np.array([])
-        stds = np.array([])
-        model.eval()
-        for i in range(args.predict_window):
-            seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
-            with torch.no_grad():
-                dist = build_dist(model, seq)
-                samples = dist.rsample((1000,))
-                test_inputs = np.append(
-                    test_inputs, samples.mean(axis=0).numpy()
-                ).reshape(-1, dim)
-                scaled_samples = scaler.inverse_transform(samples)
-                means = np.append(
-                    means, np.mean(scaled_samples, axis=0)
-                ).reshape(-1, dim)
-                stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
-                    -1, dim
-                )
+    test_inputs = evaluation_data_normalized[: -args.predict_window]
+    means = np.array([])
+    stds = np.array([])
+    model.eval()
+    for i in range(args.predict_window):
+        seq = torch.FloatTensor(test_inputs[-params_etcs["train_window"]:])
+        with torch.no_grad():
+            dist = build_dist(model, seq)
+            samples = dist.rsample((1000,))
+            test_inputs = np.append(
+                test_inputs, samples.mean(axis=0).numpy()
+            ).reshape(-1, dim)
+            scaled_samples = scaler.inverse_transform(samples)
+            means = np.append(
+                means, np.mean(scaled_samples, axis=0)
+            ).reshape(-1, dim)
+            stds = np.append(stds, np.std(scaled_samples, axis=0)).reshape(
+                -1, dim
+            )
       
     return means, stds
 
@@ -221,6 +219,7 @@ def train(training_data_normalized, params, args, device, save_flag):
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}.pkl")
+        params["final_loss"] = single_loss.item()
         save_etcs(args, params)
     else:
         return model

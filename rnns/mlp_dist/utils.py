@@ -205,6 +205,7 @@ def train(training_data_normalized, params, args, device, save_flag):
     
     if save_flag:
         torch.save(model, f"models/{args.model_name}.pkl")
+        params["final_loss"] = single_loss.item()
         save_etcs(args, params)
     else:
         return model
