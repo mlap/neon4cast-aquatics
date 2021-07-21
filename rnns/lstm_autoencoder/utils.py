@@ -98,6 +98,7 @@ def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models)
     Returns the mean and std at each time point in the prediction window
     """
     # Conditioning lstm cells
+    # First initializing both models
     model_ae, model_pn = models
     model_ae.cpu()
     model_pn.cpu()
@@ -110,18 +111,19 @@ def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models)
         with torch.no_grad():
             seq_ae, _ = e
             seq_pn, _ = condition_seq_pn[i]
+            # Forward pass through autoencoder
             model_ae(torch.from_numpy(seq_ae))
             ae_embedding = model_ae.embedding
             # I want the same input sequence from the predictive network but the last item
             seq = torch.cat((torch.from_numpy(seq_pn[-1]), ae_embedding[0]), dim=0)
-            # Forward pass
+            # Forward pass through predictive net
             y_pred = model_pn(seq.reshape(1, -1)).view(-1)
     
     
     # Now making the predictions
-    evaluation_data_ae, evaluation_data_an = evaluation_data
+    evaluation_data_ae, evaluation_data_pn = evaluation_data
     seq_ae = evaluation_data_ae[: -params_etcs["prediction_window"]]
-    input_pn = evaluation_data_an[-params_etcs["prediction_window"] - 1]
+    input_pn = evaluation_data_pn[-params_etcs["prediction_window"] - 1]
     dim = input_pn.shape[0]
     means = np.array([])
     stds = np.array([])
@@ -137,18 +139,17 @@ def evaluate(evaluation_data, condition_seqs, args, scaler, params_etcs, models)
             predictive_hidden_cell = model_pn.hidden_cell
             # Collect multiple forward passes
             for i in range(100):
+                # Resetting hidden cell every iteration
                 model_ae.hidden_cell_ae = encoder_hidden_cell 
                 model_ae.hidden_cell_de = decoder_hidden_cell
                 model_pn.hidden_cell = predictive_hidden_cell
+                # Forward pass on AE to get embedding
                 ae_pred = model_ae(torch.from_numpy(seq_ae))
                 ae_embedding = model_ae.embedding
-                try:
-                    seq = torch.cat((torch.from_numpy(input_pn).reshape(-1), ae_embedding.reshape(-1)), dim=0).reshape(1, -1)
-                except:
-                    import pdb; pdb.set_trace()
+                seq = torch.cat((torch.from_numpy(input_pn).reshape(-1), ae_embedding.reshape(-1)), dim=0).reshape(1, -1)
+                # Doing forward pass and keeping track of past AE samples
                 samples = np.append(samples, scaler.inverse_transform(model_pn(seq.reshape(1, -1)).numpy().reshape(-1, dim))).reshape(i+1, -1, dim)
                 samples_ae = np.append(samples_ae, ae_pred).reshape(-1, 14)
-            #import pdb; pdb.set_trace()
             ae_pred = samples_ae.mean(axis=0)
             input_pn = scaler.transform(samples.mean(axis=0))
             seq_ae = np.append(evaluation_data_ae, ae_pred.reshape(-1,2)).reshape(-1, 2)[day+1:day+1+params_etcs["train_window"]]

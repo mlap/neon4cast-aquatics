@@ -32,12 +32,12 @@ args = parser.parse_args()
 
 # Edit hyperparameters here
 params = {
-    "learning_rate": 0.000001,
+    "learning_rate": 0.0000001,
     "train_window": 21,
-    "hidden_dim": 100,
+    "hidden_dim": 50 ,
     "embed_dim": 7,
-    "n_layers": 3,
-    "dropout": 0.3,
+    "n_layers": 2,
+    "dropout": 0.4,
     "prediction_window": 7,
 }
 
