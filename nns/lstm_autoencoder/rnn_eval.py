@@ -69,7 +69,6 @@ def main():
         evaluation_data, condition_seqs, args, scaler_pn, params_etcs, models
     )
     # Plotting the data
-    import pdb; pdb.set_trace()
     data_len = len(evaluation_data_pn)
     start_idx = data_len - params_etcs["prediction_window"] + 1
     end_idx = data_len
