@@ -1,0 +1,8 @@
+csv_name: POSE_data
+epochs: 25
+hidden_dim: 64
+learning_rate: 1.0e-06
+n_layers: 2
+network: gru
+train_window: 21
+variable: do

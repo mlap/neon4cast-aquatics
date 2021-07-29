@@ -1,0 +1,8 @@
+csv_name: POSE_data
+dropout: 0.1
+epochs: 200
+hidden_dim: 64
+learning_rate: 1.0e-06
+output_dim: 4
+train_window: 21
+variable: do
